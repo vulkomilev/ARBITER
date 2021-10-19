@@ -13,7 +13,6 @@ class Statistics(object):
                 self.histogram_db[local_image_id] = []
             self.histogram_db[local_image_id].append(np.histogram(np.array(image['img'])))
 
-
     def predict(self, image):
         min_score = -1
         best_index = None

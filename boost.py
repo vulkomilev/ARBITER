@@ -1,5 +1,6 @@
 import tensorflow as tf
 import xgboost as xgb
+from utils import REGRESSION,CATEGORY,TIME_SERIES
 from tensorflow.keras.layers.experimental import preprocessing
 from xgboost import XGBClassifier
 import numpy as np
@@ -9,16 +10,22 @@ from pathlib import Path
 
 class BoostClass(object):
 
-    def __init__(self, image_height=256, image_width=256, labels_size=10):
+    def __init__(self, image_height=256, image_width=256, labels_size=10,tagrte_type = 'Regression'):
         self.labels_size = labels_size
-        self.classifier = self.init_network(labels_size=labels_size, image_height=image_height, image_width=image_width)
+        self.target_type = tagrte_type
+        self.classifier = self.init_network(labels_size=labels_size, image_height=image_height, image_width=image_width,
+                                            tagrte_type=tagrte_type)
 
-    def init_network(self, labels_size=10, image_height=256, image_width=256):
+    def init_network(self, labels_size=10, image_height=256, image_width=256,tagrte_type = 'Regression'):
+
+        if tagrte_type == 'Regression':
+            labels_size = 100
 
         network_input = tf.keras.Input(shape=(image_height, image_width, 3))
         network = preprocessing.Rescaling(1.0 / 255)(network_input)
         network = tf.keras.applications.ResNet50V2(include_top=False, input_shape=(image_height, image_width, 3),
                                                    pooling='avg')(network)
+
         network = tf.keras.layers.Dense(labels_size, activation='sigmoid')(network)
         self.cnn_model = tf.keras.Model(inputs=network_input, outputs=network)
         self.cnn_model.layers[1].trainable = False
@@ -40,7 +47,12 @@ class BoostClass(object):
             return np.array(self.contur_image(images))
         for image in images:
             local_x_train_arr.append(np.array(self.contur_image(image['img'])))
-            local_y_train_arr.append(tf.one_hot(image['img_id'], self.labels_size))
+            if self.target_type == CATEGORY:
+                local_y_train_arr.append(tf.one_hot(image['target'], self.labels_size))
+            elif self.target_type == REGRESSION:
+                local_target = [0]*100
+                local_target[int(image['target'])-1] = 1
+                local_y_train_arr.append(local_target)
         return np.array(local_x_train_arr), np.expand_dims(np.array(local_y_train_arr), axis=2)
 
     def predict(self, image):
@@ -63,14 +75,17 @@ class BoostClass(object):
             self.cnn_model.save('./checkpoints/' + 'cnn_boost_model')
             x_boost_train = []
             y_boost_train = y_train[:]
+            x_train_arr = []
+            y_train_arr = []
 
             for image in images:
                 x = self.prepare_data(np.array(image['img']))
                 x_boost_train.append(np.expand_dims(self.cnn_model.predict(np.array([x]))[0], axis=1))
             for x, y in zip(x_boost_train, y_boost_train):
                 x = np.squeeze(x)
-                x = np.expand_dims(x, axis=0)
-                self.classifier = self.classifier.fit(x, np.expand_dims(tf.argmax(y, axis=0), axis=0), verbose=True)
+                x_train_arr.append(x)
+                y_train_arr.append(tf.argmax(y, axis=0))
+            self.classifier = self.classifier.fit(np.array(x_train_arr), np.array(y_train_arr), verbose=True)
 
             self.classifier.save_model("./checkpoints/boost-model.json")
         return
