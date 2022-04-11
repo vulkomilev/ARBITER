@@ -1,23 +1,24 @@
-import cv2
-import tensorflow as tf
-import numpy as np
-from utils import REGRESSION, CATEGORY, TIME_SERIES
-from tensorflow.keras.layers.experimental import preprocessing
 import re
 from pathlib import Path
 
+import cv2
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.layers.experimental import preprocessing
 
-class MyResNet50(object):
+from utils.utils import REGRESSION, CATEGORY, REGRESSION_CATEGORY
 
-    def __init__(self, height_img, width_img, num_classes, target_type):
-        self.model = None
-        self.num_classes = num_classes
-        self.target_type = target_type
-        self.init_neural_network(height_img, width_img, num_classes, target_type)
+
+class NeuralNetwork(object):
 
     def init_neural_network(self, height_img, width_img, num_classes, tagrte_type):
-        if tagrte_type == 'Regression':
+        if tagrte_type == REGRESSION:
+            num_classes = 1
+            loss = 'mean_squared_error'
+        if tagrte_type == REGRESSION_CATEGORY:
             num_classes = 100
+            loss = 'categorical_crossentropy'
+
         input_model = tf.keras.Input(shape=(height_img, width_img, 3))
         model_mid = preprocessing.Rescaling(1.0 / 255)(input_model)
         model_mid = tf.keras.applications.ResNet50V2(include_top=False, input_shape=(height_img, width_img, 3),
@@ -26,7 +27,7 @@ class MyResNet50(object):
         model_mid = tf.keras.layers.Dense(num_classes, activation='sigmoid')(model_mid)
         self.model = tf.keras.Model(inputs=input_model, outputs=model_mid)
         self.model.layers[1].trainable = False
-        self.model.compile(optimizer="adam", loss="categorical_crossentropy")
+        self.model.compile(optimizer="sgd", loss=loss)
 
     def contur_image(self, img):
         grey_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -47,11 +48,13 @@ class MyResNet50(object):
             local_x_train_arr.append(np.array(self.contur_image(image['img'])))
             if self.target_type == CATEGORY:
                 local_y_train_arr.append(tf.one_hot(image['target'], self.num_classes))
-            elif self.target_type == REGRESSION:
+            elif self.target_type == REGRESSION_CATEGORY:
                 local_target = [0] * 100
                 local_target[int(image['target']) - 1] = 1
                 local_y_train_arr.append(local_target)
-
+            elif self.target_type == REGRESSION:
+                local_target = [int(image['target']) / 100.0]
+                local_y_train_arr.append(local_target)
         return np.array(local_x_train_arr), np.expand_dims(np.array(local_y_train_arr), axis=2)
 
     def train(self, images, force_train=False):
@@ -64,6 +67,8 @@ class MyResNet50(object):
         if Path('./checkpoints/' + ckpt_name).exists() and not force_train:
             self.model = tf.keras.models.load_model('./checkpoints/' + ckpt_name)
         else:
+            print(self.model.summary())
+            print(np.array(y_train).shape)
             self.model.fit(x_train, y_train, epochs=1)
             self.model.save('./checkpoints/' + ckpt_name)
 

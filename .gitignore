@@ -1,0 +1,13 @@
+/borndigital/
+/build/
+/checkpoints/
+/data_set_generator/
+/data_sets/
+/train/
+/ocr_dr.tflite
+/ocr_float16.tflite
+/recognizer_borndigital.csv
+/recognizer_borndigital.h5
+/Untitled.ipynb
+/.pytest_cache/
+/.ipynb_checkpoints/
