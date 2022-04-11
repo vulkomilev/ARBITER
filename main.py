@@ -139,14 +139,16 @@ agent_router = [{'LSTM': {'inputs': ['Count', 'Open', 'High', 'Low', 'Close', 'V
                           'outputs': [{'name': 'VWAP', 'type': REGRESSION}]}}]
 target_type = TIME_SERIES
 # ./data_sets/solvedCaptchas/
+#./data_sets/g-research-crypto-forecasting/
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
-image_collection_train, image_collection_test = image_loader('./data_sets/g-research-crypto-forecasting/'
-                                                             , train_name='train', restrict=True, \
-                                                             size=10, target_name='letter', no_ids=False,
-                                                             data_schema=data_schema, split=True)
+def runner(dataset_path):
+    image_collection_train, image_collection_test = image_loader(dataset_path
+                                                                 , train_name='train', restrict=True, \
+                                                                 size=10, target_name='letter', no_ids=False,
+                                                                 data_schema=data_schema, split=True)
 
-arbiter = Arbiter(data_schema=data_schema, target_type=target_type, class_num=image_collection_train['num_classes'],
-                  router_agent=agent_router, skip_arbiter=True)
-for i in range(10):
-    arbiter.train(image_collection_train['image_arr'], train_target='letter', force_train=True, train_arbiter=False)
-arbiter.evaluate(image_collection_train['image_arr'])
+    arbiter = Arbiter(data_schema=data_schema, target_type=target_type, class_num=image_collection_train['num_classes'],
+                      router_agent=agent_router, skip_arbiter=True)
+    for i in range(10):
+        arbiter.train(image_collection_train['image_arr'], train_target='letter', force_train=True, train_arbiter=False)
+    arbiter.evaluate(image_collection_train['image_arr'])
