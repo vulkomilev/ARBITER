@@ -232,8 +232,9 @@ def image_loader_json_images(path, restrict=False, size=1000):
     return results
 
 def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=False,
-                 load_image=False,target_name=None, data_schema=None,split=False,split_coef=0.9,THREAD_COUNT = 32):
-    THREAD_COUNT = THREAD_COUNT
+                 load_image=False,target_name=None, data_schema=None,split=False,split_coef=0.9,THREAD_COUNT_V = 32):
+    global THREAD_COUNT
+    THREAD_COUNT = THREAD_COUNT_V
     image_paths = image_list(path)
     image_ids = None
     if Path(path + train_name + '.csv').exists():
@@ -253,7 +254,7 @@ def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=Fa
 
         futures = [executor.submit(image_loader_worker, args) for args in
                    zip(image_paths_list, image_ids_splited, no_ids, target_name)]
-        print("THREAD COUNT:", len(futures))
+        print("THREAD COUNT:1", len(futures))
         local_dict = [f.result() for f in futures]
         for element in local_dict:
             results.update(element)
