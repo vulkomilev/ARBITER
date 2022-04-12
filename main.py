@@ -141,11 +141,13 @@ target_type = TIME_SERIES
 # ./data_sets/solvedCaptchas/
 #./data_sets/g-research-crypto-forecasting/
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
-def runner(dataset_path):
+def runner(dataset_path, train_name='train', restrict=True, \
+                                                                 size=10, target_name='letter', no_ids=False,
+                                                                 data_schema=data_schema, split=True,THREAD_COUNT = 32):
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name='train', restrict=True, \
                                                                  size=10, target_name='letter', no_ids=False,
-                                                                 data_schema=data_schema, split=True)
+                                                                 data_schema=data_schema, split=True,THREAD_COUNT = THREAD_COUNT)
 
     arbiter = Arbiter(data_schema=data_schema, target_type=target_type, class_num=image_collection_train['num_classes'],
                       router_agent=agent_router, skip_arbiter=True)
