@@ -5,7 +5,7 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 
 from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES, try_convert_float
-
+from NeuralNetworks.LSTM import LSTM
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 

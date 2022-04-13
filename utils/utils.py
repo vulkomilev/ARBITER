@@ -207,6 +207,7 @@ def split_list(target_list, count, restrict=False, size=1000):
         for i in range(len(splited_list)):
             random_start = random.randint(0, len(splited_list[i]) - (size + 1))
             splited_list[i] = splited_list[i][random_start:random_start + size]
+
     return splited_list
 
 def image_loader_json_images(path, restrict=False, size=1000):
@@ -238,7 +239,7 @@ def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=Fa
     image_paths = image_list(path)
     image_ids = None
     if Path(path + train_name + '.csv').exists():
-        image_ids, loaded_ids_size = load_id_from_csv(path + train_name + '.csv', data_schema)
+        image_ids, loaded_ids_size = load_id_from_csv(path + train_name + '.csv', data_schema,restrict, size)
     local_image_collection = {'num_classes': 0, 'image_arr': []}
     if size < len(image_paths):
         image_paths_list = split_list(image_paths, THREAD_COUNT, restrict, size)

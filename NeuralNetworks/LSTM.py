@@ -1,4 +1,5 @@
 from utils.Agent import *
+from utils.utils import REGRESSION,REGRESSION_CATEGORY,TIME_SERIES
 
 
 class LSTM(Agent):
