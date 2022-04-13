@@ -253,6 +253,8 @@ class Arbiter(object):
         plt.plot(preddicted_arr[-100:])
         plt.plot(target_arr[:len(preddicted_arr)][-100:])
         plt.show()
+        if len( preddicted_arr) > len(target_arr):
+            preddicted_arr = preddicted_arr[:len(target_arr)]
         mse = tf.keras.losses.MeanSquaredError()(tf.cast(preddicted_arr, tf.float32),
                                                  tf.cast(target_arr[:len(preddicted_arr)], tf.float32))
 
