@@ -3,9 +3,11 @@ import csv
 import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
-
+from utils.utils import DataCollection
 from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES, try_convert_float
 from NeuralNetworks.LSTM import LSTM
+from NeuralNetworks.MyResNet50 import MyResNet50
+from NeuralNetworks.ConstructNetwork import ConstructNetwork
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
@@ -15,12 +17,13 @@ from NeuralNetworks.LSTM import LSTM
 #    print("No GPU found")
 class Arbiter(object):
 
-    def __init__(self, data_schema, class_num, target_type, router_agent, skip_arbiter):
-        self.data_schema = data_schema
+    def __init__(self, data_schema_input,data_schema_output, class_num, target_type, router_agent, skip_arbiter):
+        self.data_schema_input = data_schema_input
+        self.data_schema_output = data_schema_output
         self.router_agent = router_agent
         self.class_num = class_num
         self.tagrte_type = target_type
-        self.init_agents(data_schema, self.class_num, target_type, router_agent)
+        self.init_agents(data_schema_input,data_schema_output, self.class_num, target_type, router_agent)
         # self.init_neural_network()
         self.skip_arbiter = skip_arbiter
         self.arbiter_router = {
@@ -68,7 +71,7 @@ class Arbiter(object):
     def agents_schema_router(self):
         pass
 
-    def init_agents(self, data_schema, class_num, tagrte_type, agent_router):
+    def init_agents(self, data_schema_input,data_schema_output, class_num, tagrte_type, agent_router):
         agent_id = 0
         for agent_type in agent_router:
             local_inputs = []
@@ -77,7 +80,7 @@ class Arbiter(object):
             agent_type_keys = [*agent_type.keys()]
             for element_input in agent_type[agent_type_keys[0]]['inputs']:
                 local_input = None
-                for element_schema in data_schema:
+                for element_schema in data_schema_input:
                     if element_schema.name == element_input:
                         local_input = element_schema
                         break
@@ -85,15 +88,13 @@ class Arbiter(object):
 
             for element_output in agent_type[agent_type_keys[0]]['outputs']:
                 local_output = None
-                for element_schema in data_schema:
+                for element_schema in data_schema_output:
                     if element_schema.name == element_output['name']:
                         local_output = element_schema
                         break
                 local_outputs.append(local_output)
-            print('self.agent_local_' + agent_type_keys[0] + ' = ' + agent_type_keys[
-                0] + '(local_inputs,local_outputs,data_schema,class_num)')
             exec('self.agent_local_' + agent_type_keys[0] + ' = ' + agent_type_keys[
-                0] + '(local_inputs,local_outputs,data_schema,class_num)')
+                0] + '(local_inputs,local_outputs,data_schema_input,data_schema_output,class_num)')
         # self.agent_boost = BoostClass(image_height=img_height, image_width=img_width, labels_size=class_num,tagrte_type=tagrte_type)
 
     def train(self, image_collection, train_target='', force_train=False, train_arbiter=True):
@@ -191,7 +192,7 @@ class Arbiter(object):
                 local_arr_x += [x]
 
         if self.skip_arbiter:
-            return np.array([local_arr_x])
+            return None,np.array([local_arr_x])
         local_arr_x = np.squeeze(local_arr_x)
         result = self.arbiter_neural_model.predict(np.array([local_arr_x]))
         # print('-------')
@@ -261,17 +262,22 @@ class Arbiter(object):
         print("!!MSE!!!")
         print(mse)
 
-    def submit(self, images, images_train):
-        f = open('submission.csv', 'x')
+    def submit(self, images):
+        f = open('submission.csv', 'w')
         writer = csv.writer(f)
-
+        local_arr = []
+        for element in self.data_schema_output:
+                local_arr.append(element.name)
+        writer.writerow(local_arr)
         for image in images:
-            submit_row = [image['img_name'], '']
             pred_indedx, _ = self.predict(image)
-            pred_indedx = np.argmax(pred_indedx, axis=1).tolist()[0]
-            for image_second in images_train:
-                if pred_indedx == image_second['target']:
-                    submit_row[1] += image_second['img_name'] + '\n'
+            if type(_[0][0]) ==  DataCollection:
+                _ = _[0][0]
+                local_arr = []
+                for element in self.data_schema_output:
+                    local_arr.append(_.get_by_name(element.name))
+                writer.writerow(local_arr)
 
-            writer.writerow(submit_row)
+
+        writer.writerow([])
         f.close()

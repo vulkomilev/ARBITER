@@ -1,6 +1,6 @@
 from arbiter import Arbiter
 from utils.utils import DataUnit
-from utils.utils import REGRESSION, TIME_SERIES
+from utils.utils import REGRESSION, CATEGORY
 from utils.utils import image_loader
 
 print('Loading images ...')
@@ -126,8 +126,18 @@ data_schema = [  DataUnit('str', (), None, 'image_name'),
 agent_router = [{'GraphSearch':{'inputs':['Image'],
                                'outputs':[{'name':'Image','type':REGRESSION}]}}]
 '''
-data_schema = [DataUnit('str', (), None, 'timestamp'),
-               DataUnit('int', (1,), None, 'Asset_ID'),
+'''
+data_schema = [
+
+                 DataUnit('str', (), None, 'name'),
+DataUnit('int', (), None, 'number'),
+    DataUnit('2D_F', (64,64), None, 'Image')]
+agent_router = [{'ConstructNetwork':{'inputs':['Image'],
+                               'outputs':[{'name':'letter','type':CATEGORY}]}}]
+'''
+'''
+data_schema = [DataUnit('str', (), None, 'timestamp',is_id=True),
+               DataUnit('int', (1,), None, 'Asset_ID',is_id=True),
                DataUnit('int', (1,), None, 'Count'),
                DataUnit('float', (1,), None, 'Open'),
                DataUnit('float', (1,), None, 'High'),
@@ -135,22 +145,53 @@ data_schema = [DataUnit('str', (), None, 'timestamp'),
                DataUnit('float', (1,), None, 'Close'),
                DataUnit('float', (1,), None, 'Volume'),
                DataUnit('float', (1,), None, 'VWAP')]
-agent_router = [{'LSTM': {'inputs': ['Count', 'Open', 'High', 'Low', 'Close', 'Volume'],
-                          'outputs': [{'name': 'VWAP', 'type': REGRESSION}]}}]
-target_type = TIME_SERIES
+agent_router = [{'LSTM':{'inputs':['Count','Open','High','Low','Close','Volume'],
+                               'outputs':[{'name':'VWAP','type':REGRESSION}]}}]
+'''
+data_schema_input = [DataUnit('str', (), None, 'timestamp',is_id=True),
+               DataUnit('int', (1,), None, 'Asset_ID',is_id=True),
+               DataUnit('int', (1,), None, 'Count'),
+               DataUnit('float', (1,), None, 'Open'),
+               DataUnit('float', (1,), None, 'High'),
+               DataUnit('float', (1,), None, 'Low'),
+               DataUnit('float', (1,), None, 'Close'),
+               DataUnit('float', (1,), None, 'Volume'),
+               DataUnit('float', (1,), None, 'VWAP'),
+               DataUnit('float', (1,), None, 'Target'),
+               DataUnit('int', (1,), None, 'group_num',is_id=True),
+               DataUnit('int', (1,), None, 'row_id',is_id=True)]
+
+data_schema_output = [DataUnit('int', (), None, 'group_num',is_id=True),
+               DataUnit('int', (1,), None, 'row_id',is_id=True),
+               DataUnit('float', (1,), None, 'Target')]
+agent_router = [{'LSTM':{'inputs':['Count','Open','High','Low','Close','Volume'],
+                               'outputs':[{'name':'Target','type':REGRESSION}]}}]
+target_type = CATEGORY
 # ./data_sets/solvedCaptchas/
 #./data_sets/g-research-crypto-forecasting/
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
 def runner(dataset_path, train_name='train', restrict=True, \
                                                                  size=10, target_name='letter', no_ids=False,
-                                                                 data_schema=data_schema, split=True,THREAD_COUNT = 32):
+                                                                 data_schema_input= data_schema_input,
+                                                                 data_schema_output = data_schema_output,
+                                                                 split=True,THREAD_COUNT = 32):
+    #image_collection_submit = image_loader(dataset_path
+    #                                                            , train_name='test', restrict=restrict, \
+    #                                                            size=800, target_name='letter', no_ids=False,
+    #                                                             data_schema=data_schema, split=False,THREAD_COUNT_V = THREAD_COUNT)
     image_collection_train, image_collection_test = image_loader(dataset_path
-                                                                 , train_name='train', restrict=True, \
-                                                                 size=800, target_name='letter', no_ids=False,
-                                                                 data_schema=data_schema, split=True,THREAD_COUNT_V = THREAD_COUNT)
+                                                                 , train_name='train', restrict=restrict, \
+                                                                 size=20000, target_name='letter', no_ids=False,
+                                                                 data_schema=data_schema_input, split=True,THREAD_COUNT_V = THREAD_COUNT)
 
-    arbiter = Arbiter(data_schema=data_schema, target_type=target_type, class_num=image_collection_train['num_classes'],
+    arbiter = Arbiter(data_schema_input=data_schema_input,
+                      data_schema_output=data_schema_output, target_type=target_type, class_num=image_collection_train['num_classes'],
                       router_agent=agent_router, skip_arbiter=True)
     for i in range(10):
         arbiter.train(image_collection_train['image_arr'], train_target='letter', force_train=True, train_arbiter=False)
-    arbiter.evaluate(image_collection_train['image_arr'])
+    #arbiter.evaluate(image_collection_train['image_arr'])
+    image_collection_submit = image_loader(dataset_path
+                                                                 , train_name='test', restrict=False, \
+                                                                 size=20000, target_name='letter', no_ids=False,
+                                                                 data_schema=data_schema_input, split=False,THREAD_COUNT_V = THREAD_COUNT)
+    arbiter.submit(image_collection_submit['image_arr'])

@@ -91,7 +91,8 @@ def try_convert_float(f):
         return 0.0
 class DataUnit(object):
 
-    def __init__(self, type, shape, data, name=''):
+    def __init__(self, type, shape, data, name='',is_id=False):
+        self.is_id = is_id
         if type not in DATA_FORMATS:
             raise RuntimeError('Data type in data provided is not supported')
         if data is not None:
@@ -180,9 +181,9 @@ def image_loader_worker(args):
             local_image_collection[image_name[:-4]] = \
             {"img": local_img, "data": None}
         else:
-            if image_name[:-4] not in image_ids.keys():
+            if image_name[:-4]+'^' not in image_ids.keys():
                 continue
-            local_img_id = image_name[:-4]
+            local_img_id = image_name[:-4]+'^'
 
             if local_img_id not in loaded_ids_target:
                 loaded_ids_target.append(local_img_id)
@@ -197,18 +198,25 @@ def image_loader_worker(args):
     return local_image_collection
 
 
-def split_list(target_list, count, restrict=False, size=1000):
-    interval = int(len(target_list) / count)
-    splited_list = []
-    for i in range(count):
-        splited_list.append(target_list[i * interval:(i + 1) * interval])
-    splited_list[-1].append(target_list[(count + 1) * interval:])
+def split_list(target_dict, count, restrict=False, size=1000):
+    interval = int(len(target_dict[target_dict.keys()[0]]) / count)
+    splited_dict = {}
+    for local_key  in splited_dict.keys():
+        splited_dict[local_key] = []
+    for local_key in splited_dict.keys():
+       for i in range(count):
+        splited_dict[local_key].append(splited_dict[local_key][i * interval:(i + 1) * interval])
+    for local_key in splited_dict.keys():
+        splited_list_rest = splited_dict[local_key][(count + 1) * interval:]
+        for i,element in enumerate(splited_list_rest):
+            splited_dict[local_key][i].append(element)
     if restrict:
-        for i in range(len(splited_list)):
-            random_start = random.randint(0, len(splited_list[i]) - (size + 1))
-            splited_list[i] = splited_list[i][random_start:random_start + size]
+        for local_key in splited_dict.keys():
+            for i in range(len( splited_dict[local_key])):
+                random_start = random.randint(0, len( splited_dict[local_key][i]) - (size + 1))
+                splited_dict[local_key][i] =  splited_dict[local_key][i][random_start:random_start + size]
 
-    return splited_list
+    return splited_dict
 
 def image_loader_json_images(path, restrict=False, size=1000):
     image_paths = image_list(path)
@@ -261,7 +269,7 @@ def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=Fa
             results.update(element)
 
     for key,val in enumerate(results):
-        image_ids[val].set_by_name('Image',results[val].get('img',None))
+        image_ids[val+'^'].set_by_name('Image',results[val].get('img',None))
     local_image_collection['num_classes'] = len(loaded_ids_target)
     if split:
         test_arr = []
@@ -289,23 +297,55 @@ def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=Fa
             random.shuffle(test_arr)
             return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr},\
                    {'num_classes': local_image_collection['num_classes'], 'image_arr': test_arr}
-    if not load_image:
-        return image_ids
+    else:
+        train_arr = []
+        # FIX THIS
 
-    return local_image_collection
+        train_cutoff = int(len(local_image_collection['image_arr']))
+        if not load_image:
+            key_list = list(image_ids.keys())
+            random.shuffle(key_list)
+            train_cutoff = int( len(key_list))
+            for i in range(0, train_cutoff):
+                train_arr.append(image_ids[key_list[i]])
+            random.shuffle(train_arr)
+            return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}
+        else:
+            for i in range(0, train_cutoff):
+                train_arr.append(local_image_collection['image_arr'][i])
 
+            random.shuffle(train_arr)
+            return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}
 
 def worker_load_image_data_from_csv(args):
     # global loaded_ids
-    list, schema,cut_size = args
+    local_dict, schema,cut_size = args
     local_data_arr = {}
-    if cut_size != -1:
-        list = list[:cut_size]
-    for row in list:
+    local_id_poss = []
+    for i,element in enumerate(schema):
+        if element.is_id:
+            local_id_poss.append(i)
+
+    for local_key in local_dict.keys():
+        if cut_size != -1:
+            local_dict[local_key] = local_dict[local_key][:cut_size]
+    local_norm_list = []
+    for i in range(len(local_dict[list(local_dict.keys())[0]])):
+        local_row = []
+        for element in schema:
+            if element.name in list(local_dict.keys()):
+             local_row.append(local_dict[element.name][i])
+            else:
+                local_row.append(None)
+        local_norm_list.append(local_row)
+    for row in local_norm_list:
         if len(row) == 0:
             continue
         try:
-            local_data_arr[str(row[0])] = DataCollection(data_size=len(row), data_schema=schema, data=row)
+            local_id_name = ''
+            for element in local_id_poss:
+                local_id_name += str(row[element]) + '^'
+            local_data_arr[local_id_name] = DataCollection(data_size=len(row), data_schema=schema, data=row)
         except Exception as e:
             print(e)
             pass
@@ -315,7 +355,8 @@ def worker_load_image_data_from_csv(args):
 def load_id_from_csv(csv_path, data_schema, restrict=False,size=100):
     local_ids = {}
     data = pd.read_csv(csv_path, low_memory=False)
-    csv_reader = data.values.tolist()
+    csv_reader = data.to_dict(orient='list')#data.values.tolist()
+
     if len(csv_reader) > THREAD_COUNT:
         id_list = split_list(target_list=csv_reader, count=THREAD_COUNT, restrict=restrict,size=size)
         data_schema = [data_schema] * THREAD_COUNT

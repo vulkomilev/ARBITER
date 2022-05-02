@@ -6,6 +6,8 @@ import numpy as np
 from PIL import Image
 from matplotlib import pyplot
 
+from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES,CATEGORY
+
 from utils.Agent import *
 
 
@@ -51,8 +53,8 @@ class MyResNet50(Agent):
                                                 weights='imagenet')(
             input_model)
 
-        (height_img,width_img,channel,)
-        model_mid = tf.keras.layers.MinPooling2D()(model_mid)
+        #(height_img,width_img,channel,)
+        model_mid = tf.keras.layers.AveragePooling2D()(model_mid)
         #1.1000 -100
         #2 0.2 0.4 0.3  1 0 1 0 1 1
         #model_mid = tf.keras.layers.Dense(100, activation='relu')(model_mid)
