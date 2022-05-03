@@ -181,7 +181,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
     #                                                             data_schema=data_schema, split=False,THREAD_COUNT_V = THREAD_COUNT)
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name='train', restrict=restrict, \
-                                                                 size=20000, target_name='letter', no_ids=False,
+                                                                 size=200, target_name='letter', no_ids=False,
                                                                  data_schema=data_schema_input, split=True,THREAD_COUNT_V = THREAD_COUNT)
 
     arbiter = Arbiter(data_schema_input=data_schema_input,

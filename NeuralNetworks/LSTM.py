@@ -166,7 +166,6 @@ class LSTM(Agent):
         if Path('./checkpoints/' + ckpt_name).exists() and not force_train:
             self.model = tf.keras.models.load_model('./checkpoints/' + ckpt_name)
         else:
-
             self.model.fit(x_train, y_train, epochs=10)
             self.model.save('./checkpoints/' + ckpt_name)
 

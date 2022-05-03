@@ -197,19 +197,40 @@ def image_loader_worker(args):
 
     return local_image_collection
 
-
-def split_list(target_dict, count, restrict=False, size=1000):
-    interval = int(len(target_dict[target_dict.keys()[0]]) / count)
-    splited_dict = {}
-    for local_key  in splited_dict.keys():
+def split_list_second(target_dict, count, restrict=False, size=1000):
+    interval = int(len(target_dict[list(target_dict.keys())[0]]) / count)
+    splited_dict = []
+    for local_key  in target_dict.keys():
         splited_dict[local_key] = []
     for local_key in splited_dict.keys():
        for i in range(count):
-        splited_dict[local_key].append(splited_dict[local_key][i * interval:(i + 1) * interval])
+        splited_dict[local_key].append(target_dict[local_key][i * interval:(i + 1) * interval])
     for local_key in splited_dict.keys():
         splited_list_rest = splited_dict[local_key][(count + 1) * interval:]
         for i,element in enumerate(splited_list_rest):
             splited_dict[local_key][i].append(element)
+
+    if restrict:
+        for local_key in splited_dict.keys():
+            for i in range(len( splited_dict[local_key])):
+                random_start = random.randint(0, len( splited_dict[local_key][i]) - (size + 1))
+                splited_dict[local_key][i] =  splited_dict[local_key][i][random_start:random_start + size]
+
+    return splited_dict
+
+def split_list(target_dict, count, restrict=False, size=1000):
+    interval = int(len(target_dict[list(target_dict.keys())[0]]) / count)
+    splited_dict = {}
+    for local_key  in target_dict.keys():
+        splited_dict[local_key] = []
+    for local_key in splited_dict.keys():
+       for i in range(count):
+        splited_dict[local_key].append(target_dict[local_key][i * interval:(i + 1) * interval])
+    for local_key in splited_dict.keys():
+        splited_list_rest = splited_dict[local_key][(count + 1) * interval:]
+        for i,element in enumerate(splited_list_rest):
+            splited_dict[local_key][i].append(element)
+
     if restrict:
         for local_key in splited_dict.keys():
             for i in range(len( splited_dict[local_key])):
@@ -320,12 +341,14 @@ def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=Fa
 def worker_load_image_data_from_csv(args):
     # global loaded_ids
     local_dict, schema,cut_size = args
+    print("type(local_dict)",type(local_dict))
+    #print(type(schema))
+    #print(type(cut_size))
     local_data_arr = {}
     local_id_poss = []
     for i,element in enumerate(schema):
         if element.is_id:
             local_id_poss.append(i)
-
     for local_key in local_dict.keys():
         if cut_size != -1:
             local_dict[local_key] = local_dict[local_key][:cut_size]
@@ -358,12 +381,20 @@ def load_id_from_csv(csv_path, data_schema, restrict=False,size=100):
     csv_reader = data.to_dict(orient='list')#data.values.tolist()
 
     if len(csv_reader) > THREAD_COUNT:
-        id_list = split_list(target_list=csv_reader, count=THREAD_COUNT, restrict=restrict,size=size)
+
+        id_dict = split_list(target_dict=csv_reader, count=THREAD_COUNT, restrict=restrict,size=size)
         data_schema = [data_schema] * THREAD_COUNT
+        id_list = []
+        for i in range(THREAD_COUNT):
+           local_dict = {}
+           for local_key in list(id_dict.keys()):
+            local_dict[local_key] = id_dict[local_key][i]
+           id_list.append(local_dict)
         if restrict:
             size = [size] * THREAD_COUNT
         else:
             size = [len(id_list[0])]* THREAD_COUNT
+        print('id_list', type(id_list))
         with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
             futures = [executor.submit(worker_load_image_data_from_csv, args) for args in zip(id_list, data_schema,size)]
             print("THREAD COUNT:", len(futures))
@@ -371,6 +402,7 @@ def load_id_from_csv(csv_path, data_schema, restrict=False,size=100):
         for element in results:
             local_ids = {**local_ids, **element}
     else:
+
         local_ids = worker_load_image_data_from_csv((csv_reader, data_schema,size))
     loaded_ids_size = len(local_ids.keys())
     return local_ids, loaded_ids_size
