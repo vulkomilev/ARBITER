@@ -174,13 +174,15 @@ def runner(dataset_path, train_name='train', restrict=True, \
                                                                  size=10, target_name='letter', no_ids=False,
                                                                  data_schema_input= data_schema_input,
                                                                  data_schema_output = data_schema_output,
+                                                                 submit_file  = 'test',
+                                                                 train_file  = 'train',
                                                                  split=True,THREAD_COUNT = 32):
     #image_collection_submit = image_loader(dataset_path
     #                                                            , train_name='test', restrict=restrict, \
     #                                                            size=800, target_name='letter', no_ids=False,
     #                                                             data_schema=data_schema, split=False,THREAD_COUNT_V = THREAD_COUNT)
     image_collection_train, image_collection_test = image_loader(dataset_path
-                                                                 , train_name='train', restrict=restrict, \
+                                                                 , train_name=train_file, restrict=restrict, \
                                                                  size=200, target_name='letter', no_ids=False,
                                                                  data_schema=data_schema_input, split=True,THREAD_COUNT_V = THREAD_COUNT)
 
@@ -191,7 +193,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
         arbiter.train(image_collection_train['image_arr'], train_target='letter', force_train=True, train_arbiter=False)
     #arbiter.evaluate(image_collection_train['image_arr'])
     image_collection_submit = image_loader(dataset_path
-                                                                 , train_name='test', restrict=False, \
+                                                                 , train_name=submit_file, restrict=False, \
                                                                  size=20000, target_name='letter', no_ids=False,
                                                                  data_schema=data_schema_input, split=False,THREAD_COUNT_V = THREAD_COUNT)
     arbiter.submit(image_collection_submit['image_arr'])
