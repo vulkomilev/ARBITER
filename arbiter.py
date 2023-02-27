@@ -266,13 +266,15 @@ class Arbiter(object):
 
             _ = _[0][0]
             local_arr = []
-            if type(image['train']) == type({}):
-                local_arr.append(str(image['train']['patient_id'][0]) + '_' + str(image['train']['laterality'][0]))
-            else:
-                local_arr.append(
-                    str(image['train'].get_by_name('patient_id')[0]) + '_' + str(
-                        image['train'].get_by_name('laterality')[2]))
-
+            try:
+                if type(image['train']) == type({}):
+                    local_arr.append(str(image['train']['patient_id'][0]) + '_' + str(image['train']['laterality'][0]))
+                else:
+                    local_arr.append(
+                        str(image['train'].get_by_name('patient_id')[0]) + '_' + str(
+                            image['train'].get_by_name('laterality')[2]))
+            except Exception as e:
+                pass
             local_arr.append(round(_, 5))
             writer.writerow(local_arr)
 

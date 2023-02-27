@@ -334,7 +334,7 @@ def worker_load_image_data_from_dir_tree_csv(args):
 
         for key_first in schema.keys():
             if 'csv' not in element:
-                for second_path in os.listdir(dir_path + '/' + key_first + '/' + element):
+                for second_path in os.listdir(dir_path + '/' +  'test_images/' + element):
                     if (element + '/' + second_path) not in schema_transformed.keys():
                         schema_transformed[element + '/' + second_path] = {}
                     for key in schema.keys():
@@ -352,7 +352,7 @@ def worker_load_image_data_from_dir_tree_csv(args):
         print(done_count, '/', len(local_list))
         for key in schema.keys():
             if '.csv' not in element:
-                for val_i, second_path in enumerate(os.listdir(dir_path + '/' + key + '/' + element)):
+                for val_i, second_path in enumerate(os.listdir(dir_path + '/' +  'test_images/' + element)):
                     if df is None:
                         df = pd.read_csv(dir_path + '/' + key + '.csv')
 
@@ -372,9 +372,10 @@ def worker_load_image_data_from_dir_tree_csv(args):
 
 
                             else:
+                                pass
                                 # for element_second in local_dict[second_key.name]:
-                                schema_transformed[element + '/' + second_path][key][second_key.name].append(
-                                    local_dict[second_key.name][val_i])
+                                #schema_transformed[element + '/' + second_path][key][second_key.name].append(
+                                #    local_dict[second_key.name][val_i])
             row = schema_transformed[element + '/' + second_path][key]
             try:
                 schema_transformed[element + '/' + second_path][key] = DataCollection(data_size=None,
@@ -434,7 +435,7 @@ def worker_load_image_data_from_csv(args):
 
 def load_id_from_dir_tree_csv(dir_path, data_schema, restrict=False, size=100):
     local_ids = {}
-    data = os.listdir(dir_path + '' + list(data_schema.keys())[0])
+    data = os.listdir(dir_path + 'test_images' )# list(data_schema.keys())[0])
     print('len(data) >= THREAD_COUNT', len(data) >= THREAD_COUNT)
     if len(data) >= THREAD_COUNT:
         id_list = []

@@ -128,7 +128,7 @@ class CellularAutomataAndData(Agent):
         lr = 2e-3
         lr_sched = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
             [2000], [lr, lr * 0.1])
-        self.model.load_weights('./model/')
+        self.model.load_weights('./model/model')
         self.trainer = tf.keras.optimizers.Adam(lr_sched)
         self.loss_log = []
 
