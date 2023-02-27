@@ -2,28 +2,20 @@ import csv
 
 import numpy as np
 import tensorflow as tf
-from matplotlib import pyplot as plt
-from utils.utils import DataCollection
 from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES, try_convert_float
-from NeuralNetworks.LSTM import LSTM
-from NeuralNetworks.MyResNet50 import MyResNet50
-from NeuralNetworks.ConstructNetwork import ConstructNetwork
 
-# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+from NeuralNetworks.CellularAutomataAndData import CellularAutomataAndData
 
-# if tf.test.gpu_device_name():
-#    print('GPU found')
-# else:
-#    print("No GPU found")
+
 class Arbiter(object):
 
-    def __init__(self, data_schema_input,data_schema_output, class_num, target_type, router_agent, skip_arbiter):
+    def __init__(self, data_schema_input, data_schema_output, class_num, target_type, router_agent, skip_arbiter):
         self.data_schema_input = data_schema_input
         self.data_schema_output = data_schema_output
         self.router_agent = router_agent
         self.class_num = class_num
         self.tagrte_type = target_type
-        self.init_agents(data_schema_input,data_schema_output, self.class_num, target_type, router_agent)
+        self.init_agents(data_schema_input, data_schema_output, self.class_num, target_type, router_agent)
         # self.init_neural_network()
         self.skip_arbiter = skip_arbiter
         self.arbiter_router = {
@@ -63,7 +55,6 @@ class Arbiter(object):
             layer_size = layer_size / 2.0
         self.arbiter_neural_network = tf.keras.layers.Dense(class_num)( \
             self.arbiter_neural_network)
-        print("arbiter_neural_network_input", self.arbiter_neural_network_input)
         self.arbiter_neural_model = tf.keras.Model(inputs=self.arbiter_neural_network_input,
                                                    outputs=self.arbiter_neural_network)
         self.arbiter_neural_model.compile(optimizer="sgd", loss=loss)
@@ -71,7 +62,20 @@ class Arbiter(object):
     def agents_schema_router(self):
         pass
 
-    def init_agents(self, data_schema_input,data_schema_output, class_num, tagrte_type, agent_router):
+    def get_name_from_schema(self, schema, inputs):
+        local_keys = []
+        if type(schema) == dict:
+            for element in schema.keys():
+                local_keys += self.get_name_from_schema(schema[element], inputs)
+        elif type(schema) == list:
+            for element in schema:
+                local_keys.append(element.name)
+
+        else:
+            raise Exception('NO foc king listr ')
+        return local_keys
+
+    def init_agents(self, data_schema_input, data_schema_output, class_num, tagrte_type, agent_router):
         agent_id = 0
         for agent_type in agent_router:
             local_inputs = []
@@ -80,29 +84,30 @@ class Arbiter(object):
             agent_type_keys = [*agent_type.keys()]
             for element_input in agent_type[agent_type_keys[0]]['inputs']:
                 local_input = None
-                for element_schema in data_schema_input:
-                    if element_schema.name == element_input:
-                        local_input = element_schema
-                        break
-                local_inputs.append(local_input)
+                local_inputs.append(element_input)
 
             for element_output in agent_type[agent_type_keys[0]]['outputs']:
                 local_output = None
-                for element_schema in data_schema_output:
-                    if element_schema.name == element_output['name']:
-                        local_output = element_schema
-                        break
+                print(element_output['name'])
+                local_output = element_output
+
                 local_outputs.append(local_output)
             exec('self.agent_local_' + agent_type_keys[0] + ' = ' + agent_type_keys[
                 0] + '(local_inputs,local_outputs,data_schema_input,data_schema_output,class_num)')
-        # self.agent_boost = BoostClass(image_height=img_height, image_width=img_width, labels_size=class_num,tagrte_type=tagrte_type)
+
+    def save(self):
+        local_agents = []
+        for element in dir(self):
+            if 'agent_' in element:
+                local_agents.append(element)
+        for element in local_agents:
+            self.__getattribute__(element).save()
 
     def train(self, image_collection, train_target='', force_train=False, train_arbiter=True):
         local_agents = []
         for element in dir(self):
             if 'agent_' in element:
                 local_agents.append(element)
-        print(local_agents)
         for element in local_agents:
             self.__getattribute__(element).train(image_collection, force_train=force_train)
 
@@ -163,11 +168,6 @@ class Arbiter(object):
         y_fit = np.array(y_fit)
 
         model_ = self.arbiter_neural_model.fit(x_fit, y_fit, epochs=200)  # x_fit,y_fit
-        # print([y_fit[0]])
-        # print(self.arbiter_neural_model.predict(np.array([x_fit[0]])))
-        # plt.plot(list(model_.history.values())[0], 'k-o')
-        # plt.show()
-        # exit(0)
 
     def predict(self, image):
         local_agents = []
@@ -192,18 +192,15 @@ class Arbiter(object):
                 local_arr_x += [x]
 
         if self.skip_arbiter:
-            return None,np.array([local_arr_x])
+            return None, np.array([local_arr_x])
         local_arr_x = np.squeeze(local_arr_x)
         result = self.arbiter_neural_model.predict(np.array([local_arr_x]))
-        # print('-------')
-        # print(result)
+
         return result, local_predictions
 
     def evaluate(self, images):
         correct_count = 0
         wrong_count = 0
-        print('-------------------')
-        print(len(images))
         div_arr = []
         preddicted_arr = []
         target_arr = []
@@ -213,71 +210,71 @@ class Arbiter(object):
 
             for element_output in agent_type[agent_type_keys[0]]['outputs']:
                 local_output = None
-                for element_schema in self.data_schema:
+                for element_schema in self.data_schema_input['train']:
                     if element_schema.name == element_output['name']:
                         local_output = element_schema
                         break
                 local_outputs.append(local_output)
-        for image in images:
-            pred = self.predict(image)
+        pred = self.predict(images)
 
-            if self.tagrte_type == REGRESSION_CATEGORY:
-                pred_indedx = np.argmax(pred, axis=1).tolist()[0]
+        if self.tagrte_type == REGRESSION_CATEGORY:
+            pred_indedx = np.argmax(pred, axis=1).tolist()[0]
 
-                print("pred_indedx", pred_indedx, '-', image['target'])
-                if pred_indedx == image['target']:
-                    correct_count += 1
-                else:
-                    wrong_count += 1
-                print(correct_count, '/', (correct_count + wrong_count))
-                print('', end='\r')
-            elif self.tagrte_type == REGRESSION:
-                preddicted_arr.append(int(list(pred)[0][0] * 100))
-                target_arr.append(image.get_by_name(local_outputs[0].name))
-                # print(int(pred.tolist()[0][0]*100),image['target'])
-                # print(list(pred)[0][0],image.get_by_name(local_outputs[0].name),image.get_by_name('Open'))
-                div_arr.append(list(pred)[0][0] / image.get_by_name(local_outputs[0].name))
-            elif self.tagrte_type == IMAGE:
-                if len(pred.shape) == 2:
-                    continue
-                preddicted_arr.append(try_convert_float(pred[0][0][0]))
-                target_arr.append(image.get_by_name(local_outputs[0].name))
-            elif self.tagrte_type == TIME_SERIES:
+            print("pred_indedx", pred_indedx, '-', images['target'])
+            if pred_indedx == images['target']:
+                correct_count += 1
+            else:
+                wrong_count += 1
 
-                if type(pred[0][0]) != int and type(pred[0][0]) != np.int64:
-                    preddicted_arr += list(pred[0][0])
+        elif self.tagrte_type == REGRESSION:
+            preddicted_arr.append(int(list(pred)[0][0] * 100))
+            target_arr.append(images.get_by_name(local_outputs[0].name))
+            div_arr.append(list(pred)[0][0] / images.get_by_name(local_outputs[0].name))
+        elif self.tagrte_type == IMAGE:
 
-                # preddicted_arr.append(try_convert_float(pred[0][0]))
-                target_arr.append(image.get_by_name(local_outputs[0].name))
-        print("len(preddicted_arr)", len(preddicted_arr))
-        print("len(target_arr)", len(target_arr))
-        plt.plot(preddicted_arr[-100:])
-        plt.plot(target_arr[:len(preddicted_arr)][-100:])
-        plt.show()
-        if len( preddicted_arr) > len(target_arr):
-            preddicted_arr = preddicted_arr[:len(target_arr)]
-        mse = tf.keras.losses.MeanSquaredError()(tf.cast(preddicted_arr, tf.float32),
-                                                 tf.cast(target_arr[:len(preddicted_arr)], tf.float32))
+            preddicted_arr.append(try_convert_float(pred[0][0][0]))
+            target_arr.append(images.get_by_name(local_outputs[0].name))
+        elif self.tagrte_type == TIME_SERIES:
 
-        print("!!MSE!!!")
-        print(mse)
+            if type(pred[0][0]) != int and type(pred[0][0]) != np.int64:
+                preddicted_arr += list(pred[0][0])
+
+    def get_schema_names(self, schema):
+        return_list = []
+        if type(schema) is dict:
+            for element_key in schema.keys():
+                local_element = schema[element_key]
+                return_list += self.get_schema_names(local_element)
+        elif type(schema) is list:
+            for element in schema:
+                return_list.append(element.name)
+        return return_list
 
     def submit(self, images):
-        f = open('submission.csv', 'w')
+        f = open('submission.csv', 'w+')
         writer = csv.writer(f)
         local_arr = []
-        for element in self.data_schema_output:
+        if type(self.data_schema_output) is list:
+            for element in self.data_schema_output:
                 local_arr.append(element.name)
+        else:
+            local_arr = self.get_schema_names(self.data_schema_output)
         writer.writerow(local_arr)
         for image in images:
-            pred_indedx, _ = self.predict(image)
-            if type(_[0][0]) ==  DataCollection:
-                _ = _[0][0]
-                local_arr = []
-                for element in self.data_schema_output:
-                    local_arr.append(_.get_by_name(element.name))
-                writer.writerow(local_arr)
 
+            pred_indedx, _ = self.predict(image)
+
+            _ = _[0][0]
+            local_arr = []
+            if type(image['train']) == type({}):
+                local_arr.append(str(image['train']['patient_id'][0]) + '_' + str(image['train']['laterality'][0]))
+            else:
+                local_arr.append(
+                    str(image['train'].get_by_name('patient_id')[0]) + '_' + str(
+                        image['train'].get_by_name('laterality')[2]))
+
+            local_arr.append(round(_, 5))
+            writer.writerow(local_arr)
 
         writer.writerow([])
         f.close()

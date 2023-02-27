@@ -170,7 +170,7 @@ class KerasOcr(Agent):
 
         filenamePNG = str(random.randint(1000000, 2000000)) + ".png"
         image_path = './data_sets/captcha/createCaptcha10.png'
-        image_path = '/home/x000ff4/open_source/arbiter/data_sets/solvedCaptchas/G/11248.png'  # './data_sets/captcha/output.png'
+        image_path = 'None'
         tflite_output = self.run_tflite_model(image_path, 'dr')
         for output in tflite_output:
             print(output)

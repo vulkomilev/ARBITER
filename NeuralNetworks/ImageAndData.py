@@ -11,13 +11,16 @@ from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES,CATE
 from utils.Agent import *
 
 
-class MyResNet50(Agent):
+class ImageAndData(Agent):
 
     def __init__(self, local_inputs, local_outputs, data_schema_input, data_schema_output, class_num):
         self.model = None
         local_input = None
+        data_schema_input = data_schema_input['train']
+        self.data_schema_output = data_schema_output
+        print('data_schema_input',data_schema_input)
         for element in data_schema_input:
-            if element.name == 'Image':
+            if element.name == 'image_data':
                local_input = element
         self.init_neural_network(local_input,local_outputs,data_schema_input,class_num)
         self.total_tested = 0
@@ -37,7 +40,10 @@ class MyResNet50(Agent):
         elif self.local_output['type'] == CATEGORY or self.local_output['type'] == 'str':
             self.num_classes = class_num
             loss = 'categorical_crossentropy'
-        self.num_classes = 37
+        elif self.local_output['type'] ==  'mean_squared_error':
+            loss = 'mean_squared_error'
+            self.num_classes = 1
+
         height_img = None
         width_img = None
         depth_img = None
@@ -50,10 +56,10 @@ class MyResNet50(Agent):
             height_img = inputs.shape[1]
             depth_img = 3
 
-        input_model = tf.keras.Input(shape=(331, 331,3))
+        input_model = tf.keras.Input(shape=(337, 337,3))
        # model_mid = preprocessing.Rescaling(1.0 / 255)(input_model)
         #ResNet152V2  70%
-        model_mid = tf.keras.applications.NASNetLarge(include_top=False,
+        model_mid = tf.keras.applications.ResNet50(include_top=False,
                                                 weights='imagenet')(
             input_model)
 
@@ -63,9 +69,9 @@ class MyResNet50(Agent):
         #2 0.2 0.4 0.3  1 0 1 0 1 1
         #model_mid = tf.keras.layers.Dense(100, activation='relu')(model_mid)
         #model_mid = tf.keras.layers.Dropout(0.1)(model_mid)
-        #model_mid = tf.keras.layers.Flatten()(model_mid)
+        model_mid = tf.keras.layers.Flatten()(model_mid)
         #model_mid = tf.keras.layers.Dense(100, activation='relu')(model_mid)
-        model_mid = tf.keras.layers.Dense(37, activation='softmax')(model_mid)# sum(37) = 1.0
+        model_mid = tf.keras.layers.Dense(self.num_classes, activation='softmax')(model_mid)# sum(37) = 1.0
         self.model = tf.keras.Model(inputs=input_model, outputs=model_mid)
 
         self.model.layers[1].trainable = False
@@ -86,8 +92,9 @@ class MyResNet50(Agent):
         local_y_train_arr = []
         # np.pad(np.array(images), ((5,6),(5,6),(0, 0)), mode='constant',constant_values=255)
         local_y_labels = []
+
         if not in_train:
-            local_image = images.get_by_name('Image')
+            local_image = images.get_by_name('image_data')
             if local_image is None:
                 return []
             local_image = np.array(local_image)
@@ -96,14 +103,28 @@ class MyResNet50(Agent):
 
             mean = 0.0  # some constant
             std = 32.0  # some constant (standard deviation)
-            print("local_image.shape", local_image.shape)
+            #print("local_image.shape", local_image.shape)
 
-            local_image = preprocess_fix_dim(local_image,331,331)#np.pad(np.array(local_image), ((5, 6), (5, 6), (0, 0)), mode='constant', constant_values=255)
+            local_image = preprocess_fix_dim(local_image,337,337)#np.pad(np.array(local_image), ((5, 6), (5, 6), (0, 0)), mode='constant', constant_values=255)
             local_image = cv2.threshold(local_image, 84, 255, cv2.THRESH_BINARY)[1]
             return local_image
             #return np.pad(np.array(images), ((5,6),(5,6),(0, 0)), mode='constant',constant_values=255)#(np.array(images),(75,75,3))
         for image in images:
-            local_image = image.get_by_name('Image')
+
+            local_y = None
+            try:
+
+                local_image = image['train'].get_by_name('image_data')
+                for element in self.data_schema_output['train']:
+                    if not element.is_id :
+                        local_y= image['train'].get_by_name(element.name)
+            except Exception as e:
+                local_image = image['train']['image_data']
+                for element in self.data_schema_output['train']:
+                    if not element.is_id :
+                        local_y = image['train'][element.name]
+            if len(local_image) == 0:
+             continue
             if local_image is None:
                 continue
             local_image = np.array(local_image)
@@ -113,11 +134,11 @@ class MyResNet50(Agent):
 
             mean = 0.0  # some constant
             std = 32.0  # some constant (standard deviation)
-            print("local_image.shape",local_image.shape)
+            #print("local_image.shape",local_image.shape)
 
-            local_image = preprocess_fix_dim(local_image, 331, 331)         #local_image = np.pad(np.array(local_image), ((5, 6), (5, 6), (0, 0)), mode='constant', constant_values=255)
-            local_image = cv2.threshold(local_image, 84, 255, cv2.THRESH_BINARY)[1]
-            local_image = np.roll(local_image, (random.randint(0,10),random.randint(0,10)),(0,1))
+            local_image = np.pad(np.expand_dims(preprocess_fix_dim(local_image, 337, 337),axis=2) ,((0, 0), (0, 0),(2, 0)))       #local_image = np.pad(np.array(local_image), ((5, 6), (5, 6), (0, 0)), mode='constant', constant_values=255)
+            #local_image = cv2.threshold(local_image, 84, 255, cv2.THRESH_BINARY)[1]
+            #local_image = np.roll(local_image, (random.randint(0,10),random.randint(0,10)),(0,1))
             '''
             noisy_img = local_image + np.random.normal(mean, std, local_image.shape)
             local_image = np.clip(noisy_img, 0, 255)
@@ -141,30 +162,17 @@ class MyResNet50(Agent):
 
             #pyplot.imshow(local_image)
             #pyplot.show()
-            local_x_train_arr.append(local_image)
-            for data in image.data_collection:
-                if data.name == self.local_output['name']:
-                    local_data = data.data
-                    break
-            if self.local_output['type'] == CATEGORY or 'str':
-                #print('self.local_output.name',image.get_by_name(self.local_output.name))
-                if image.get_by_name(self.local_output['name']) not in local_y_labels:
-                    local_y_labels.append(image.get_by_name(self.local_output['name']))
-                print("len(local_y_labels)",image.get_by_name(self.local_output['name']))
-                local_y_train_arr.append(tf.one_hot(image.get_by_name(self.local_output['name']), self.num_classes))
-            elif self.local_output['type'] == REGRESSION_CATEGORY:
-                local_target = [0] * 100
-                local_target[int(local_data) - 1] = 1
-                local_y_train_arr.append(local_target)
-            elif self.local_output['type'] == REGRESSION:
-                local_target = [int(local_data) /100.0]
-                local_y_train_arr.append(local_target)
+            np.array(local_y_train_arr.append(local_y))
+            np.array(local_x_train_arr.append(local_image))
+
         #local_x_train_arr = local_x_train_arr[:10000]
-        #local_y_train_arr = local_y_train_arr[:10000]
         return np.array(local_x_train_arr),np.array(local_y_train_arr)
 
     def train(self, images, force_train=False):
+
         x_train, y_train = self.prepare_data(images, in_train=True)
+        print(x_train.shape)
+        print(y_train.shape)
 
         ckpt_name = 'default_cpkt_name'
         re_result = re.search(r'.*\.(\w*)', str(self.__class__), re.S | re.U | re.I)
@@ -173,13 +181,16 @@ class MyResNet50(Agent):
         if Path('./checkpoints/' + ckpt_name).exists() and not force_train:
             self.model = tf.keras.models.load_model('./checkpoints/' + ckpt_name)
         else:
-            print(self.model.summary())
-            print(np.array(y_train).shape)
+            #print(self.model.summary())
+            #print(np.array(y_train).shape)
 
-            print('FIT')
+            print('FIT',len(x_train))
+            #print(np.array(x_train[0]).shape)
+            #print(y_train[0])
             self.model.fit(x_train, y_train,batch_size=32, epochs=30,validation_split=0.1)
             self.model.save('./checkpoints/' + ckpt_name)
-
+    def save(self):
+        pass
     def predict(self, image):
         img= self.prepare_data(image, in_train=False)
         if len(img) == 0:
@@ -450,13 +461,6 @@ def preprocess_fix_dim(raw_img, height=75, width=75):
     """
     raw_img = cv2.resize(np.array(raw_img, np.uint8), (height, width))
 
-    #for i in range(0, len(raw_img)):
-    #    for j in range(len(raw_img[i]), height):
-    #        raw_img[i].append(0)
 
-    #for i in range(0, len(raw_img)):
-    #    for j in range(0, len(raw_img[i])):
-    #        num = raw_img[i][j]
-    #        raw_img[i][j] = [num, num, num]
     return raw_img
 

@@ -1,3 +1,4 @@
+import pydicom
 import concurrent.futures
 import copy
 import json
@@ -6,12 +7,17 @@ import random
 import math
 from pathlib import Path
 from collections.abc import Iterable
+from utils.utils import DataCollection,DataUnit
+
+import matplotlib.pyplot as plt
+from PIL import Image, ImageOps
+from sklearn.model_selection import train_test_split
 
 import cv2
 import numpy as np
 import pandas as pd
-import pydicom
-from pydicom.pixel_data_handlers.util import apply_voi_lut
+
+from tqdm.auto import tqdm
 
 IMAGE_WIDTH = 256
 IMAGE_HEIGHT = 256
@@ -20,9 +26,9 @@ loaded_ids = []
 loaded_ids_target = []
 index_csv = {}
 
-IMAGE_EXTS_LIST = ['jpg', 'png']
+IMAGE_EXTS_LIST = ['jpg', 'png','tiff']
 DATA_FORMATS_SPECIAL = [ '2D_F', '2D_INT']
-DATA_FORMATS = ['float', 'int', 'str','date'] + DATA_FORMATS_SPECIAL
+DATA_FORMATS = ['float', 'int', 'str'] + DATA_FORMATS_SPECIAL
 REGRESSION_CATEGORY = 'int'
 REGRESSION = 'float'
 CATEGORY = 'Category'
@@ -33,210 +39,49 @@ TARGET_TYPES = [REGRESSION,REGRESSION_CATEGORY, CATEGORY, TIME_SERIES,IMAGE]
 HEURISTICS = {}
 
 
-class DataCollection(object):
 
-    def __init__(self, data_size, data_schema, data):
-        self.data_size = data_size
-        self.data_collection = []
-        self.data_schema = data_schema
-        self.add_data(data)
-        for element in data_schema:
-            if element.type not in DATA_FORMATS:
-                raise RuntimeError('Data type in schema is not supported')
+cfg = {
+    'train_df': '/tmp/data_sets/hubmap-organ-segmentation/train.csv',
+    'train_img': '/tmp/data_sets/hubmap-organ-segmentation/train_images/',
+    'train_annot': '/tmp/data_sets/hubmap-organ-segmentation/train_annotations/',
+    'slices': 4, #Batch size = slices ** 2
+    'epochs': 3,
+    'img_shape': 2304,
+    'lr': 1e-03
+}
 
-    def get_shape_by_name(self, name):
-        for element in self.data_collection:
-            if element.name == name:
-                return element.shape
+def rle2mask(mask_rle, shape=(1600,256)):
+    '''
+    mask_rle: run-length as string formated (start length)
+    shape: (width,height) of array to return
+    Returns numpy array, 1 - mask, 0 - background
 
-    def get_by_name(self, name):
-        for element in self.data_collection:
-            if element.name == name:
-                return element.data
+    '''
+    s = mask_rle.split()
+    starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]
+    starts -= 1
+    ends = starts + lengths
+    img = np.zeros(shape[0]*shape[1], dtype=np.uint8)
+    for lo, hi in zip(starts, ends):
+        img[lo:hi] = 1
+    return img.reshape(shape).T
+train_df = None
+def display_img(idx: int):
+    '''
+    Displays image along with its mask
+    '''
 
-    def set_by_name(self, name,val):
-        for i,element in enumerate(self.data_collection):
-            if element.name == name:
-                self.data_collection[i].data = copy.deepcopy(val)
-                return
+    row = train_df.loc[train_df['id'] == int(idx)]
+    h, w = row['img_height'].iloc[-1], row['img_width'].iloc[-1]
+    img = Image.open(row['paths'].iloc[-1])
+    img = np.array(img)
+    sample = row['rle'].iloc[0]
+    mask = rle2mask(sample, shape=(int(h), int(w)))
+    mask = np.expand_dims(mask,axis=2)
+    mask = np.pad(mask, pad_width=((0,0),(0,0),(0,2)), mode='constant', constant_values=0)
 
+    return img, mask
 
-    def add_data(self, data):
-        if type(data) == dict:
-            data_element_collection = []
-            added_elements = []
-            for schema_element, element in zip(self.data_schema, data):
-                data_unit = DataUnit(type_val=schema_element.type, shape=schema_element.shape, name=schema_element.name,
-                                     data=data[schema_element.name])
-                added_elements.append(schema_element.name)
-                data_element_collection.append(data_unit)
-                self.data_collection = data_element_collection
-        else:
-            if len(data) == 0:
-                return
-
-                #assert (len(data_element) == self.data_size)
-            data_element_collection = []
-            added_elements = []
-            for schema_element, element in zip(self.data_schema, data):
-                    data_unit = DataUnit(type_val=schema_element.type, shape=schema_element.shape, name=schema_element.name,
-                                         data=element)
-                    added_elements.append(schema_element.name)
-                    data_element_collection.append(data_unit)
-            for element in self.data_schema:
-                if element.name == 'Image':
-                    data_unit = DataUnit(type_val=element.type, shape=element.shape, name=element.name,
-                                         data=None)
-                    data_element_collection.append(data_unit)
-
-
-            self.data_collection = data_element_collection
-
-    def remove(self, name):
-
-        for element in self.data_collection:
-            if element.name == name:
-                self.remove(element)
-
-def try_convert_float(f):
-    try:
-        print(f)
-        return float(f)
-    except Exception as e:
-        return 0.0
-
-class DataUnit(object):
-
-    def __init__(self, type_val, shape, data, name='',is_id=False,break_seq=False,break_size=100):
-        self.is_id = is_id
-        if type_val not in DATA_FORMATS:
-            raise RuntimeError('Data type in data provided is not supported')
-        if data is not None:
-            if np.array(data).shape != shape and shape != () and \
-                np.array([data]).shape != shape:
-
-                raise RuntimeError('Data shape is different form the schema',np.array([data]).shape , shape)
-
-        if type(data) != type(None):
-
-            if type_val == 'str':
-                data = str(data)
-            elif type_val == 'int':
-                #try:
-                    if np.isnan(data).any():
-                        data = np.nan
-                    else:
-                        data = np.array(data, dtype=np.int)
-                #except:
-                #    print(type(data))
-                #    data = np.array(data, dtype=np.int)
-
-            elif type_val == 'float':
-                if np.isnan(data):
-                    data = np.nan
-                else:
-                    data = np.array(data, dtype=np.float)
-        self.type = type_val
-        self.shape = shape
-        self.data = data
-        self.name = name
-        self.break_seq = break_seq
-        self.break_size = break_size
-
-def one_hot(string_list,element_key):
-
-    unique_indentifier = list(set(string_list))
-    if len(unique_indentifier) > 250 and element_key.break_seq == False:
-        return []
-    #exit(0)
-    if element_key.break_seq:
-        return_arr = []
-        local_alphabet = []
-        for arr in string_list:
-            for element in arr:
-                if element not in local_alphabet:
-                    local_alphabet.append(element)
-        unique_indentifier = list(set(local_alphabet))
-        for arr in string_list:
-            local_arr = []
-            for element_pos in range(len(arr)):
-                if element_pos % element_key.break_size == 0:
-                    local_arr.append([])
-                local_entry = [0] * len(unique_indentifier)
-                local_entry[unique_indentifier.index(arr[element_pos])] = 1
-                local_arr[-1].append(local_entry)
-            for i in range(element_key.break_size-len(local_arr[-1])):
-                 local_arr[-1].append([0] * len(unique_indentifier))
-            return_arr.append(local_arr)
-        return return_arr
-
-    else:
-        unique_str =  len(unique_indentifier)
-        one_hot_list = []
-        for element in string_list :
-            local_entry = [0]*unique_str
-            local_entry[unique_indentifier.index(element)] = 1
-            one_hot_list.append(local_entry)
-        #print('len(one_hot_list)',len(one_hot_list))
-        return one_hot_list
-
-def contur_image(img):
-    grey_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur_img = cv2.blur(grey_img, (3, 3), 0)
-    contur_img = cv2.Sobel(src=blur_img, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=5)
-    return contur_img
-
-
-def is_int(i):
-    try:
-        int(i)
-        return True
-    except Exception as e:
-        return False
-
-def is_float(i):
-    try:
-        float(i)
-        return True
-    except Exception as e:
-        return False
-def is_float_arr(i):
-    try:
-        for element in i:
-            float(element)
-        return True
-    except Exception as e:
-        return False
-
-def normalize_list(local_list,max_val,min_val,target_max,target_min):
-    print(min_val)
-    print(type(min_val))
-    if (abs(min_val)+abs(max_val)) == 0:
-        return local_list
-    if len(local_list) == 0:
-        return local_list
-    if type(local_list[0]) == type([]):
-        return local_list
-    for i in range(len(local_list)):
-
-        local_list[i] = ((local_list[i]+abs(min_val))/((abs(min_val)+abs(max_val)))) -abs(target_min)*1
-        if math.isnan(local_list[i]) :
-            local_list[i] = 0
-    return local_list
-
-def flatten_list(xs):
-    for x in xs:
-        if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
-            yield from flatten_list(x)
-        else:
-            yield x
-
-def re_size_image(img):
-    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
-    return img
-
-
-# is this thread save
 def image_json_loader_worker(args):
     global loaded_ids_target
     image_paths = args
@@ -275,7 +120,10 @@ def image_loader_worker(args):
             continue
         if image_path[-1] != '/':
             image_path  = image_path +'/'
-        local_img = cv2.imread(image_path + image_name)
+        ds = pydicom.read_file(
+            image_path + image_name)
+
+        local_img =ds.pixel_array#= cv2.imread(image_path + image_name)
 
 
 
@@ -284,9 +132,9 @@ def image_loader_worker(args):
             local_image_collection[image_name[:-4]] = \
             {"img": local_img, "data": None}
         else:
-            if image_name[:-4]+'^' not in image_ids.keys():
+            if image_name[:image_name.index('.')]+'^' not in image_ids.keys():
                 continue
-            local_img_id = image_name[:-4]+'^'
+            local_img_id = image_name[:image_name.index('.')]+'^'
 
             if local_img_id not in loaded_ids_target:
                 loaded_ids_target.append(local_img_id)
@@ -295,10 +143,10 @@ def image_loader_worker(args):
             if  img_shape != None and len(img_shape) > 0:
                 local_img = cv2.resize(local_img, (img_shape[0], img_shape[1]))
                 local_data = copy.deepcopy(image_ids[local_img_id])
-            local_image_collection[image_name[:-4]] ={"img": local_img,
-                     "img_name": image_name[:-4]}
-    return local_image_collection
+            local_image_collection[image_name[:image_name.index('.')]] ={"img": local_img,
+                     "img_name": image_name[:image_name.index('.')]}
 
+    return local_image_collection
 def split_list_second(target_dict, count, restrict=False, size=1000):
     interval = int(len(target_dict[list(target_dict.keys())[0]]) / count)
     splited_dict = []
@@ -358,7 +206,6 @@ def split_dict(target_dict, count, restrict=False, size=1000):
                 splited_dict[local_key][i] =  splited_dict[local_key][i][random_start:random_start + size]
 
     return splited_dict
-
 def image_loader_json_images(path, restrict=False, size=1000):
     image_paths = image_list(path)
     image_ids = None
@@ -385,14 +232,15 @@ def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=Fa
                  load_image=False,target_name=None, data_schema=None,split=False,split_coef=0.9,THREAD_COUNT_V = 32,
                  dir_tree = False):
     global THREAD_COUNT
+    global train_df, valid_df
     THREAD_COUNT = THREAD_COUNT_V
-    image_paths = image_list(path)
+    image_paths = image_list(path+'train_images/')
     image_ids = None
     if Path(path + train_name + '.csv').exists():
         if not dir_tree:
             image_ids, loaded_ids_size = load_id_from_csv(path + train_name + '.csv', data_schema,restrict, size)
         else:
-            image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path , data_schema, restrict, size)
+            image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path +'train_images', data_schema, restrict, size)
     elif   dir_tree:
             image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path , data_schema, restrict, size)
     local_image_collection = {'num_classes': 0, 'image_arr': []}
@@ -406,6 +254,14 @@ def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=Fa
     no_ids = [no_ids] * THREAD_COUNT
     target_name = [target_name] * THREAD_COUNT
     results = {}
+
+    df = pd.read_csv(cfg['train_df'])
+    df['paths'] = [f'/tmp/data_sets/hubmap-organ-segmentation/train_images/{str(i)}.tiff' for i in tqdm(df['id'])]
+    train_df, valid_df = train_test_split(df, test_size=0.2, shuffle=True, random_state=20)
+    train_df.reset_index(drop=True, inplace=True)
+    valid_df.reset_index(drop=True, inplace=True)
+    train_df.head()
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
 
         futures = [executor.submit(image_loader_worker, args) for args in
@@ -415,7 +271,13 @@ def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=Fa
         for element in local_dict:
             results.update(element)
     for key,val in enumerate(results):
-        image_ids[val+'^'].set_by_name('Image',results[val].get('img',None))
+        try:
+
+            img, mask = display_img(val)
+            image_ids[val+'^'].set_by_name('Image',cv2.resize(img, dsize=(900, 900), interpolation=cv2.INTER_CUBIC))
+            image_ids[val + '^'].set_by_name('ImageMask', cv2.resize(mask, dsize=(900, 900), interpolation=cv2.INTER_CUBIC))
+        except Exception as e:
+            pass
     local_image_collection['num_classes'] = len(loaded_ids_target)
     if split:
         test_arr = []
@@ -450,20 +312,18 @@ def image_loader(path,train_name = 'train', restrict=False, size=1000, no_ids=Fa
         train_cutoff = int(len(local_image_collection['image_arr']))
         if not load_image:
             key_list = list(image_ids.keys())
-            if dir_tree :
-                return {'num_classes': local_image_collection['num_classes'], 'image_arr': image_ids}, None
             random.shuffle(key_list)
             train_cutoff = int( len(key_list))
             for i in range(0, train_cutoff):
                 train_arr.append(image_ids[key_list[i]])
             random.shuffle(train_arr)
-            return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr},None
+            return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}
         else:
             for i in range(0, train_cutoff):
                 train_arr.append(local_image_collection['image_arr'][i])
 
             random.shuffle(train_arr)
-            return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr},None
+            return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}
 
 def worker_load_image_data_from_dir_tree_csv(args):
     # global loaded_ids
@@ -481,48 +341,29 @@ def worker_load_image_data_from_dir_tree_csv(args):
             local_list = local_list[:cut_size]
     schema_transformed = {}
     for element in local_list:
-        if os.path.exists(dir_path+element):
 
-          for key in schema.keys():
-            print( os.path.exists(dir_path+element))
-            if os.path.isfile(dir_path+element):
-                if (key) not in schema_transformed.keys():
-                    schema_transformed[key] = {}
-
-                for local_data_unit in schema[key]:
-                        if local_data_unit.name not in schema_transformed[key].keys():
-                            schema_transformed[key][local_data_unit.name] = []
-            else:
-                for second_path in os.listdir(dir_path+element):
-                    if ( element+'/'+second_path) not in schema_transformed.keys():
-                        schema_transformed[ element+'/'+second_path] = {}
-                    for key in schema.keys():
-                        if key not in schema_transformed[ element+'/'+second_path].keys():
-                            schema_transformed[ element+'/'+second_path][key] = {}
-                        for local_data_unit in schema[key]:
-                            if local_data_unit.name not in schema_transformed[ element+'/'+second_path][key].keys():
-                                schema_transformed[ element+'/'+second_path][key][local_data_unit.name] = []
+        for key in schema.keys():
+            if 'csv' not in element:
+             for second_path in os.listdir(dir_path+'/'+element):
+                if ( element+'/'+second_path) not in schema_transformed.keys():
+                    schema_transformed[ element+'/'+second_path] = {}
+                for key in schema.keys():
+                    if key not in schema_transformed[ element+'/'+second_path].keys():
+                        schema_transformed[ element+'/'+second_path][key] = {}
+                    for local_data_unit in schema[key]:
+                        if local_data_unit.name not in schema_transformed[ element+'/'+second_path][key].keys():
+                            schema_transformed[ element+'/'+second_path][key][local_data_unit.name] = []
     local_norm_list = []
-    for key in schema.keys():
+    for element in local_list:
 
-        if os.path.isfile(dir_path + key+'.csv'):
+        for key in schema.keys():
+            for second_path in os.listdir(dir_path+'/'+element):
 
-
-
-                    df = pd.read_csv(dir_path + key+'.csv')
-                    local_dict = df.to_dict()
-                    for second_key in schema[key]:
-                        for element_second in local_dict[second_key.name].values():
-                            schema_transformed[key ][second_key.name].append(element_second)
-        else:
-            for element in local_list:
-                for second_path in os.listdir(dir_path+element):
-
-                    df = pd.read_csv(dir_path+element+'/'+second_path+'/' +key+'.csv')
-                    local_dict = df.to_dict()
-                    for second_key in schema[key]:
-                        for element_second in local_dict[second_key.name].values():
-                            schema_transformed[element+'/'+second_path][key][second_key.name].append(element_second)
+                df = pd.read_csv(dir_path+'/' +'train.csv')
+                local_dict = df.to_dict()
+                for second_key in schema[key]:
+                    for element_second in local_dict[second_key.name].values():
+                        schema_transformed[element+'/'+second_path][key][second_key.name].append(element_second)
 
     return schema_transformed
     '''
@@ -655,6 +496,6 @@ def image_list(path):
     image_path_list = []
     for root, subdirs, files in os.walk(path):
         for file in files:
-            if file[-3:] in IMAGE_EXTS_LIST:
+            if file[file.index('.')+1:] in IMAGE_EXTS_LIST:
                 image_path_list.append((root, file))
     return image_path_list[1:]

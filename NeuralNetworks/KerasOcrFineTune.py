@@ -241,8 +241,7 @@ class KerasOcrFineTune(Agent):
     def predict(self, image):
 
         filenamePNG = str(random.randint(1000000, 2000000)) + ".png"
-        image_path = './data_sets/captcha/createCaptcha10.png'
-        image_path = '/home/x000ff4/open_source/arbiter/borndigital/test/8PP97.png'
+        image_path=''
         tflite_output = self.run_tflite_model(image_path, 'dr')
         for output in tflite_output:
             print(output)

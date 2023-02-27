@@ -187,13 +187,7 @@ class NBMEcustom(Agent):
             print('result', key_arr[np.argmax(local_result) - 1], np.argmax(local_result))
         return
 
-        try:
 
-            img = cv2.imread('/home/x000ff4/open_source/arbiter/borndigital/train/1SH2P.png')
-        except Exception:
-            return '''
-                        format is not valid or recognized 
-                   '''
         img, preprocessed_image = preprocess_image(img)
 
         image, contours = cv2.findContours(preprocessed_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
