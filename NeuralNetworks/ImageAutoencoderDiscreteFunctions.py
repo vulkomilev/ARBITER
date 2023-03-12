@@ -4,6 +4,7 @@ import os
 import numpy as np
 
 from utils.Agent import *
+from custom_layers.ConvSymb import ConvSymb
 import matplotlib.pyplot as plt
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import matplotlib.animation as animation
@@ -117,13 +118,16 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             width_img = local_input.shape[0]
             height_img = local_input.shape[1]
             depth_img = 3
+        def custom_func(inputs):
 
+            inputs /= 2
+            return inputs
         self.encoder = tf.keras.Sequential([
             tf.keras.layers.InputLayer(input_shape=(width_img, height_img, depth_img)),
-            tf.keras.layers.Conv2D(
-                filters=3, kernel_size=3, strides=(2, 2), activation='relu'),
-            tf.keras.layers.Conv2D(
-                filters=3, kernel_size=3, strides=(2, 2), activation='relu'),
+            ConvSymb(
+                filters=3,rank=2, custom_function=custom_func, strides=(2, 2), activation='relu'),
+            ConvSymb(
+                filters=3, rank=2,custom_function=custom_func, strides=(2, 2), activation='relu'),
             tf.keras.layers.Flatten(),
             tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu'),
             tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu'),
@@ -148,25 +152,6 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             ]
         )
 
-        '''
-         self.decoder = tf.keras.Sequential(
-                [
-    
-                    tf.keras.layers.InputLayer(input_shape=(latent_dim,)),
-                    tf.keras.layers.Dense(units=32 * 16 * 3, activation=tf.nn.relu),
-                    tf.keras.layers.Reshape(target_shape=(32, 16, 3),name='r1'),
-                    tf.keras.layers.Conv2DTranspose(
-                        filters=3, kernel_size=(width_img, width_img), strides=(2, 2), padding='same',
-                        activation='relu'),
-                    tf.keras.layers.Conv2DTranspose(
-                        filters=3, kernel_size=(width_img*4, height_img*4), strides=(2, 2), padding='same',
-                        activation='relu'),
-    
-                    tf.keras.layers.Reshape((width_img, height_img, depth_img), input_shape=(16,),name='r2')
-    
-                ]
-            )
-         '''
     def contur_image(self, img):
         grey_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blur_img = cv2.blur(grey_img, (1, 1), 0)
@@ -201,14 +186,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             local_image_input = images_collection[local_key]['input']
             if images_collection[local_key]['output'] is None or images_collection[local_key]['input'] is None:
                 continue
-            #if random.choice([True, False]):
-            #    local_target_train_arr.append('rot')
-            #    # print(images_collection[local_key]['output'])
-            #
-            #    # print(images_collection[local_key]['input'])
-            #    images_collection[local_key]['output'] = np.rot90(images_collection[local_key]['output'])
-            #else:
-            #    local_target_train_arr.append('none')
+
             local_image_output = images_collection[local_key]['output']
             if type(local_image_output) == type(None) or type(local_image_input) == type(None):
                 continue
@@ -286,70 +264,13 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         logpz = self.log_normal_pdf(z, 0., 0.)
         logqz_x =  self.log_normal_pdf(z, mean, logvar)
         return -tf.reduce_mean(logpx_z + logpz - logqz_x)
-    '''
-    def compute_loss(self, model, x, y, is_plot=False):
 
-
-        x_img = x
-
-        # x_type = tf.convert_to_tensor([func_map_decode[func_name]])
-        mean, logvar = self.encode(x_img)
-        #mean = self.custom_function_1(mean)
-        z = self.reparameterize(mean, logvar)
-        x_logit = self.decode(z)
-
-        cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=np.array([y]).astype(dtype=np.float32))
-        logpx_z = -tf.reduce_sum(np.array([cross_ent]), axis=[1, 2, 3])
-        z_fix = np.zeros((96,1))
-        #bottom left
-
-
-
-        logpz = self.log_normal_pdf(z, 0., 0.)
-        logqz_x = self.log_normal_pdf(z, mean, logvar)
-        image_1 = x_img.astype('float64')
-        image_1 *= 255.0 / image_1.max()
-
-        image = x_logit.numpy()[0]
-        image *= 255.0 / image.max()
-        #self.last_img = image
-        z = z.numpy()[0]
-       # z += 3#z.min()
-        #z *= 255.0 / z.max()
-        #z = np.reshape(z,newshape=(12,8,1))
-        #z = np.pad(z, [(0, 0), (0, 0),(0,2)], mode='constant')
-        self.calc_map_plot_counter+=1
-        #if self.calc_map_plot_counter %1 == 0 :
-        # self.conn_send.send(image_1[0])#[z.tolist()] image
-        #cv2.imshow('frame',  np.zeros(shape=(128,128,3), dtype = np.uint8 ) )#np.array(image, dtype = np.uint8 ) )
-        #plt.imshow(data, interpolation='nearest')
-
-        #plt.show()
-
-        #pyplot.imshow(image_1[0])
-        #pyplot.show()
-        #pyplot.imshow(y[0])
-        #pyplot.show()
-        #pyplot.imshow(image_1[0])
-        #pyplot.show()
-        #exit(0)
-        return -tf.reduce_mean(logpx_z + logpz - logqz_x)
-    '''
     def train(self, images, force_train=False):
         global  last_img
         print('loaded images',images)
         x_train, y_train, func_name = self.prepare_data(images, in_train=True)
         print('prepare_data',np.array(x_train).shape)
-        loss_arr = []
-        #rand_loc = random.randint(0,len(x_train)-101)
-        #x_train = x_train[rand_loc:rand_loc+100]
-        #y_train = y_train[rand_loc:rand_loc+100]
-        #plt.imshow(x_train[0][0])
-        #plt.show()
-        #exit(0)
-        image_1 = images[0].get_by_name('Image')
-        loss_enc_arr = []
-        loss = 0
+
         for x, y in zip(x_train, y_train):
             with tf.GradientTape(persistent=True) as tape:
 

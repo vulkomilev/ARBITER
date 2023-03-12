@@ -1,10 +1,13 @@
 import csv
-
+import datetime
 import numpy as np
 import tensorflow as tf
+from utils.utils import normalize_list, one_hot, DataUnit, DataCollection, DataBundle, DataInd
 from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES, try_convert_float
 
+from NeuralNetworks.DenseScrable import DenseScrable
 from NeuralNetworks.CellularAutomataAndData import CellularAutomataAndData
+from NeuralNetworks.ImageAutoencoderDiscreteFunctions import ImageAutoencoderDiscreteFunctions
 
 
 class Arbiter(object):
@@ -15,12 +18,60 @@ class Arbiter(object):
         self.router_agent = router_agent
         self.class_num = class_num
         self.tagrte_type = target_type
-        self.init_agents(data_schema_input, data_schema_output, self.class_num, target_type, router_agent)
+        self.bundle_bucket = []
+        self.registered_networks = {}
+        self.init_agents(router_agent)
         # self.init_neural_network()
         self.skip_arbiter = skip_arbiter
+
         self.arbiter_router = {
             "": []
         }
+
+    def add_bundle_bucket(self, element):
+        self.bundle_bucket.append(element)
+
+    def register_neural_network(self, neural_network, input_shape, output_shape):
+        input_list = []
+        output_list = []
+
+        register_input = []
+        register_output = []
+
+        for element in self.data_schema_input:
+            if not element.is_id:
+                input_list.append(element)
+
+        for element in self.data_schema_output:
+            if not element.is_id:
+                output_list.append(element)
+
+        for element in input_shape:
+            is_shape_found = False
+            for second_element in input_list:
+                if element.shape == second_element.shape:
+                    element.name = second_element.name
+                    register_input.append(element)
+                    is_shape_found = True
+                    break
+            if is_shape_found:
+                input_list.remove(second_element)
+
+        for element in output_shape:
+            is_shape_found = False
+            for second_element in output_list:
+                if element.shape == second_element.shape:
+                    element.name = second_element.name
+                    register_output.append(element)
+                    is_shape_found = True
+                    break
+            if is_shape_found:
+                output_list.remove(second_element)
+
+        if len(register_input) > 0 and len(register_output) > 0:
+            self.registered_networks[neural_network] = {'neural_network': neural_network,
+                                                        'input_list': register_input,
+                                                        'output_list': register_output}
 
     def init_neural_network(self):
         agent_size = 0
@@ -62,6 +113,136 @@ class Arbiter(object):
     def agents_schema_router(self):
         pass
 
+    def normalize_date(self, date_list):
+        return_list = []
+        for element in date_list:
+            return_list.append(float(datetime.datetime.strptime(element, '%Y-%m-%d %H:%M:%S').strftime("%s")))
+        return_list = normalize_list(return_list, max(return_list), min(return_list), 1.0, -1.0)
+        return return_list
+
+    def normalize(self, data, data_schema, path, target):
+        return_dict = {}
+        return_dict_min = {}
+        return_dict_max = {}
+
+        if type(data_schema) is dict:
+            for element_key in data_schema.keys():
+                local_element = data[element_key]
+                return_dict[element_key], l_min, l_max = self.normalize(local_element, data_schema[element_key],
+                                                                        path + [element_key])
+                return_dict_min[element_key.name] = l_min
+                return_dict_max[element_key.name] = l_max
+        elif type(data_schema) is list:
+            for i, element_key in enumerate(data_schema):
+                local_data = None
+                local_data_path = ''
+                for element_path in path:
+                    local_data_path += '[' + element_path + ']'
+                print('data' + '[' + element_key.name + ']')
+
+                local_data = []
+                for element in data:
+                    local_data.append(element.get_by_name(element_key.name))
+                if type(local_data) == list or type(local_data) == type(np.ndarray(shape=0)):
+                    if element_key.type == 'int' and element_key.is_id == False:
+
+                        return_dict_min[element_key.name] = min(local_data)
+                        return_dict_max[element_key.name] = max(local_data)
+                        return_dict[element_key.name] = normalize_list(local_data, max(local_data), min(local_data),
+                                                                       1.0, -1.0)
+
+                    elif element_key.type == 'date' and element_key.is_id == False:
+                        return_dict_min[element_key.name] = min(local_data)
+                        return_dict_max[element_key.name] = max(local_data)
+                        return_dict[element_key.name] = self.normalize_date(local_data)
+
+                    elif element_key.type == 'str' and element_key.is_id == False:
+                        local_data = one_hot(local_data, element_key)
+                        if len(local_data) > 0:
+                            return_dict_min[element_key.name] = min(local_data)
+                            return_dict_max[element_key.name] = max(local_data)
+                            return_dict[element_key.name] = local_data
+
+                    elif element_key.type == 'float' and element_key.is_id == False:
+                        return_dict_min[element_key.name] = min(local_data)
+                        return_dict_max[element_key.name] = max(local_data)
+                        return_dict[element_key.name] = normalize_list(local_data, max(local_data), min(local_data),
+                                                                       1.0, -1.0)
+
+                    elif element_key.is_id == False:
+                        print('!!!!!!!!!!!!!!!!!!!!!!')
+                        print(element_key.type)
+                        exit(0)
+
+        return return_dict, return_dict_min, return_dict_max
+
+    def empty_bucket(self):
+        self.bundle_bucket = []
+
+    def normalize_data_bundle(self, is_submit=False):
+        local_bundle_bucket = {'source': {},
+                               'target': {}}
+        return_list = []
+        for key in list(self.bundle_bucket[0].source.get_dict()):
+            local_bundle_bucket['source'][key] = []
+        for key in list(self.bundle_bucket[0].target.get_dict()):
+            local_bundle_bucket['target'][key] = []
+        source_ids = []
+        target_ids = []
+        ind_list = []
+
+        for element in self.bundle_bucket:
+            ind_list.append(element.data_ind)
+            local_dict = element.source.get_dict()
+            for k, v in local_dict.items():
+                local_bundle_bucket['source'][k].append(v)
+            local_dict_ids = element.source.get_dict(include_only_id=True)
+            for k, v in local_dict_ids.items():
+                source_ids.append(v)
+            local_dict = element.target.get_dict()
+            for k, v in local_dict.items():
+                local_bundle_bucket['target'][k].append(v)
+            local_dict_ids = element.target.get_dict(include_only_id=True)
+            for k, v in local_dict_ids.items():
+                target_ids.append(v)
+        max_len = len(source_ids)
+        local_bundle_bucket['source'] = []
+        local_bundle_bucket['target'] = []
+
+        for element in self.bundle_bucket:
+            local_bundle_bucket['source'].append(element.source)
+            local_bundle_bucket['target'].append(element.target)
+        local_bundle_bucket['source'], _, _ = self.normalize(local_bundle_bucket['source'],
+                                                             local_bundle_bucket['source'][0].data_schema, [],
+                                                             target='source')
+        if not is_submit:
+            local_bundle_bucket['target'], l_min, l_max = self.normalize(local_bundle_bucket['target'],
+                                                                         local_bundle_bucket['target'][0].data_schema,
+                                                                         [], target='source')
+            self.target_min = l_min
+            self.target_max = l_max
+
+        for i in range(max_len):
+            local_row = []
+            source_data_schema = list(local_bundle_bucket['source'].keys())
+            local_row.append(source_ids[i])
+            for k in source_data_schema:
+                local_row.append(local_bundle_bucket['source'][k][i])
+            source = DataCollection(data_size=len(local_row), data_schema=self.bundle_bucket[0].source.data_schema,
+                                    data=local_row)
+            target = None
+            if not is_submit:
+                local_row = []
+                source_data_schema = list(local_bundle_bucket['target'].keys())
+                local_row.append(target_ids[i])
+                for k in source_data_schema:
+                    local_row.append(local_bundle_bucket['target'][k][i])
+                target = DataCollection(data_size=len(local_row), data_schema=self.bundle_bucket[0].target.data_schema,
+                                        data=local_row)
+            return_list.append(DataBundle(data_ind=ind_list[i], source=source,
+                                          target=target))
+        self.bundle_bucket = return_list
+
     def get_name_from_schema(self, schema, inputs):
         local_keys = []
         if type(schema) == dict:
@@ -75,25 +256,12 @@ class Arbiter(object):
             raise Exception('NO foc king listr ')
         return local_keys
 
-    def init_agents(self, data_schema_input, data_schema_output, class_num, tagrte_type, agent_router):
-        agent_id = 0
+    def init_agents(self, agent_router):
         for agent_type in agent_router:
-            local_inputs = []
-            local_outputs = []
-
             agent_type_keys = [*agent_type.keys()]
-            for element_input in agent_type[agent_type_keys[0]]['inputs']:
-                local_input = None
-                local_inputs.append(element_input)
-
-            for element_output in agent_type[agent_type_keys[0]]['outputs']:
-                local_output = None
-                print(element_output['name'])
-                local_output = element_output
-
-                local_outputs.append(local_output)
             exec('self.agent_local_' + agent_type_keys[0] + ' = ' + agent_type_keys[
-                0] + '(local_inputs,local_outputs,data_schema_input,data_schema_output,class_num)')
+                0] + '()')
+            exec('self.agent_local_' + agent_type_keys[0] + '.register(self)')
 
     def save(self):
         local_agents = []
@@ -103,25 +271,28 @@ class Arbiter(object):
         for element in local_agents:
             self.__getattribute__(element).save()
 
-    def train(self, image_collection, train_target='', force_train=False, train_arbiter=True):
-        local_agents = []
-        for element in dir(self):
-            if 'agent_' in element:
-                local_agents.append(element)
-        for element in local_agents:
-            self.__getattribute__(element).train(image_collection, force_train=force_train)
+    def match_bundle_to_reg(self, local_bundle, model_io_reg):
+
+        for bundle_i_element in model_io_reg:
+            model_io_reg
+
+    def train(self, force_train=False, train_arbiter=True):
+
+        for local_bundle in self.bundle_bucket:
+            for element in self.registered_networks.keys():
+                self.registered_networks[element]['neural_network'].train(local_bundle, force_train=force_train)
 
         if train_arbiter and not self.skip_arbiter:
             local_y = []
             local_x = []
-            for image in image_collection:
+            for image in self.bundle_bucket:
                 local_predictions = {}
                 local_predictions_index = []
                 x_element = []
-                for element in local_agents:
-                    local_predictions[element] = self.__getattribute__(element).predict(image)
+                for element in self.registered_networks.keys():
+                    local_predictions[element] = self.registered_networks[element]['neural_network'].predict(image)
 
-                for element in local_agents:
+                for element in self.registered_networks.keys():
                     local_predictions_index.append(local_predictions[element])
 
                 for key in local_predictions.keys():
@@ -133,7 +304,7 @@ class Arbiter(object):
                     x_element.append(local_result)
                 local_x.append(x_element)
 
-                local_y.append(image.get_by_name(train_target))
+                local_y.append(image.target)
             self.train_arbiter(local_x, local_y)
 
     def train_arbiter(self, agent_results, target):
@@ -250,8 +421,14 @@ class Arbiter(object):
                 return_list.append(element.name)
         return return_list
 
-    def submit(self, images):
-        f = open('submission.csv', 'w+')
+    def denormalize(self, data):
+        if type(data) is not type([]):
+            data = list(self.target_min.values())[0] + data * (
+                        list(self.target_max.values())[0] - list(self.target_min.values())[0])
+            return data
+
+    def submit(self, file_dest=''):
+        f = open(file_dest + 'submission.csv', 'w+')
         writer = csv.writer(f)
         local_arr = []
         if type(self.data_schema_output) is list:
@@ -260,22 +437,18 @@ class Arbiter(object):
         else:
             local_arr = self.get_schema_names(self.data_schema_output)
         writer.writerow(local_arr)
-        for image in images:
+        for image in self.bundle_bucket:
 
             pred_indedx, _ = self.predict(image)
 
-            _ = _[0][0]
+            _ = np.squeeze(_)
+            _ = self.denormalize(_)
             local_arr = []
             try:
-                if type(image['train']) == type({}):
-                    local_arr.append(str(image['train']['patient_id'][0]) + '_' + str(image['train']['laterality'][0]))
-                else:
-                    local_arr.append(
-                        str(image['train'].get_by_name('patient_id')[0]) + '_' + str(
-                            image['train'].get_by_name('laterality')[2]))
+                local_arr.append(image.source.get_by_name('id'))
             except Exception as e:
                 pass
-            local_arr.append(round(_, 5))
+            local_arr.append(_)
             writer.writerow(local_arr)
 
         writer.writerow([])

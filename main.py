@@ -404,33 +404,24 @@ agent_router = [{'ImageAndData':{'inputs':['Image','Id','site_id','patient_id', 
                                            'age', 'cancer', 'biopsy', 'invasive', 'BIRADS'],
                                'outputs':[{'name':'cancer','type':REGRESSION}]}}]
                                                                          """
-data_schema_input = {
-    'train': [
-        DataUnit('2D_F', (900,900), None, 'image_data'),
-        DataUnit('int', (), None, 'site_id', is_id=True),
-        DataUnit('int', (), None, 'patient_id', is_id=True,break_seq=True),
-        DataUnit('int', (), None, 'image_id', is_id=True),
-        DataUnit('str', (), None, 'laterality', is_id=False),
-        DataUnit('str', (), None, 'view', is_id=False),
-        DataUnit('int', (), None, 'age', is_id=False),
-        DataUnit('int', (), None, 'cancer', is_id=False),
-        DataUnit('int', (), None, 'biopsy', is_id=False),
-        DataUnit('int', (), None, 'invasive', is_id=False),
-        DataUnit('int', (), None, 'BIRADS', is_id=False)]
-}
+data_schema_input = [
+                     DataUnit('int', (), None, 'id',is_id=True),
+                     DataUnit('int', (), None, 'CementComponent',is_id=False),
+                     DataUnit('float', (), None, 'BlastFurnaceSlag',is_id=False),
+                     DataUnit('float', (), None, 'FlyAshComponent',is_id=False),
+                     DataUnit('int', (), None, 'WaterComponent',is_id=False),
+                     DataUnit('float', (), None, 'SuperplasticizerComponent',is_id=False),
+                     DataUnit('float', (), None, 'CoarseAggregateComponent',is_id=False),
+                     DataUnit('float', (), None, 'FineAggregateComponent',is_id=False),
+                     DataUnit('int', (), None, 'AgeInDays',is_id=False)]
 
-data_schema_output = {
-                'train':[
-                   DataUnit('int', (), None, 'site_id',is_id=True),
-                   DataUnit('int', (), None, 'cancer',is_id=False)]}
-#tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
-agent_router = [{'CellularAutomataAndData':{'inputs':['Image','Id','site_id','patient_id', 'image_id', 'laterality', 'view',
-                                           'age', 'cancer', 'biopsy', 'invasive', 'BIRADS'],
-                               'outputs':[{'name':'cancer','type':REGRESSION}]}}]
+data_schema_output = [
+                   DataUnit('int', (), None, 'id',is_id=True),
+                   DataUnit('float', (), None, 'Strength')]
 
+agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
+                               'outputs':[{'name':'Image','type':IMAGE}]}}]
 target_type = CATEGORY
-# ./data_sets/solvedCaptchas/
-#./data_sets/g-research-crypto-forecasting/
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
 def runner(dataset_path, train_name='train', restrict=True, \
                                                                  size=10, target_name='letter', no_ids=False,
@@ -443,27 +434,48 @@ def runner(dataset_path, train_name='train', restrict=True, \
     print('from utils.' + utils_name + ' import image_loader')
     exec('from utils.' + utils_name + ' import image_loader')
     image_loader = importlib.import_module('utils.' + utils_name ,package='.').image_loader
-    #from utils.specific_loaders.hubmapOrganSegmentationUtils import image_loader
-    #image_collection_submit,_ = image_loader(dataset_path
-    #                                                            , train_name='train', restrict=restrict, \
-    #                                                            size=800, target_name='letter', no_ids=False,
-    #                                                             data_schema=data_schema_input, split=False,THREAD_COUNT_V = THREAD_COUNT,
-    #                                                             dir_tree=dir_tree)
+
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name=train_file, restrict=restrict, \
                                                                  size=200, target_name='letter', no_ids=False,
-                                                                 data_schema=data_schema_input, split=split,THREAD_COUNT_V = THREAD_COUNT,
+                                                                 data_schema_input=data_schema_input,
+                                                                 data_schema_output=data_schema_output,
+                                                                 split=split,THREAD_COUNT_V = THREAD_COUNT,
                                                                  dir_tree=dir_tree)
     print('DATA COLLECTED')
     arbiter = Arbiter(data_schema_input=data_schema_input,
                       data_schema_output=data_schema_output, target_type=target_type, class_num=image_collection_train['num_classes'],
                       router_agent=agent_router, skip_arbiter=True)
-    #for i in range(1):
-    #   arbiter.train(image_collection_train['image_arr'], train_target='letter', force_train=True, train_arbiter=False)
+    for element in image_collection_train['image_arr']:
+        arbiter.add_bundle_bucket(element)
+    arbiter.normalize_data_bundle()
+    for i in range(1):
+       arbiter.train( force_train=True, train_arbiter=False)
     arbiter.save()
-    arbiter.submit(image_collection_train['image_arr'])
-    #image_collection_submit = image_loader(dataset_path
-    #                                                             , train_name=submit_file, restrict=False, \
-    #                                                             size=200, target_name='letter', no_ids=False,
-    #                                                             data_schema=data_schema_input, split=False,THREAD_COUNT_V = THREAD_COUNT)
-    #arbiter.submit(image_collection_submit['image_arr'])
+    arbiter.empty_bucket()
+    data_schema_input = [
+        DataUnit('int', (), None, 'id', is_id=True),
+        DataUnit('int', (), None, 'CementComponent', is_id=False),
+        DataUnit('float', (), None, 'BlastFurnaceSlag', is_id=False),
+        DataUnit('float', (), None, 'FlyAshComponent', is_id=False),
+        DataUnit('int', (), None, 'WaterComponent', is_id=False),
+        DataUnit('float', (), None, 'SuperplasticizerComponent', is_id=False),
+        DataUnit('float', (), None, 'CoarseAggregateComponent', is_id=False),
+        DataUnit('float', (), None, 'FineAggregateComponent', is_id=False),
+        DataUnit('int', (), None, 'AgeInDays', is_id=False)]
+
+    data_schema_output = [
+        DataUnit('int', (), None, 'id', is_id=True),
+        DataUnit('float', (), None, 'Strength')]
+
+    image_collection_train, image_collection_test = image_loader(dataset_path
+                                                                 , train_name=submit_file, restrict=restrict, \
+                                                                 size=200, target_name='letter', no_ids=False,
+                                                                 data_schema_input=data_schema_input,
+                                                                 data_schema_output=data_schema_output,
+                                                                 split=split,THREAD_COUNT_V = THREAD_COUNT,
+                                                                 dir_tree=dir_tree)
+    for element in image_collection_train['image_arr']:
+        arbiter.add_bundle_bucket(element)
+    arbiter.normalize_data_bundle(is_submit=True)
+    arbiter.submit('/kaggle/working/')
