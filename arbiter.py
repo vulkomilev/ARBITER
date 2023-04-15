@@ -8,6 +8,7 @@ from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES, try
 from NeuralNetworks.DenseScrable import DenseScrable
 from NeuralNetworks.CellularAutomataAndData import CellularAutomataAndData
 from NeuralNetworks.ImageAutoencoderDiscreteFunctions import ImageAutoencoderDiscreteFunctions
+from NeuralNetworks.ImageAndData import ImageAndData
 
 
 class Arbiter(object):
@@ -20,8 +21,9 @@ class Arbiter(object):
         self.tagrte_type = target_type
         self.bundle_bucket = []
         self.registered_networks = {}
+        self.input_arbiter_len = 0
         self.init_agents(router_agent)
-        # self.init_neural_network()
+        self.init_neural_network()
         self.skip_arbiter = skip_arbiter
 
         self.arbiter_router = {
@@ -74,41 +76,45 @@ class Arbiter(object):
                                                         'output_list': register_output}
 
     def init_neural_network(self):
-        agent_size = 0
-        for element in dir(self):
-            if 'agent_' in element:
-                if 'boost' in element:
-                    agent_size += 100
-                elif self.tagrte_type == REGRESSION_CATEGORY:
-                    agent_size += 100
-                elif self.tagrte_type == REGRESSION:
-                    agent_size += 1
-                else:
-                    agent_size += self.class_num
+        input_list = []
+        output_len = 0
 
-        if self.tagrte_type == REGRESSION_CATEGORY:
-            class_num = 100
-            loss = 'categorical_crossentropy'
-        elif self.tagrte_type == REGRESSION:
-            class_num = 1
-            loss = 'mean_squared_error'
-        else:
-            class_num = self.class_num
-            loss = 'mean_squared_error'
-        self.arbiter_neural_network_input = tf.keras.Input((agent_size))
-        layer_size = agent_size
+        for element in self.data_schema_output:
+            if not element.is_id:
+                if element.shape == ():
+                    input_list.append(1)
+                else:
+                    input_list.append(element.shape)
+
+        for element in self.data_schema_output:
+            if not element.is_id:
+                if element.shape == ():
+                    input_list.append(1)
+                else:
+                    input_list.append(element.shape)
+
+        for element in self.data_schema_output:
+            if not element.is_id:
+                if element.shape == ():
+                    output_len += 1
+                else:
+                    output_len += element.shape
+
+        self.input_arbiter_len = output_len
+        self.arbiter_neural_network_input = tf.keras.Input(len(input_list))
+        layer_size = len(input_list)
         self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
             self.arbiter_neural_network_input)
-        layer_size = agent_size / 2.0
+        layer_size = len(input_list) / 2.0
         while layer_size > 1:
             self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
                 self.arbiter_neural_network)
             layer_size = layer_size / 2.0
-        self.arbiter_neural_network = tf.keras.layers.Dense(class_num)( \
+        self.arbiter_neural_network = tf.keras.layers.Dense(output_len)( \
             self.arbiter_neural_network)
         self.arbiter_neural_model = tf.keras.Model(inputs=self.arbiter_neural_network_input,
                                                    outputs=self.arbiter_neural_network)
-        self.arbiter_neural_model.compile(optimizer="sgd", loss=loss)
+        self.arbiter_neural_model.compile(optimizer="sgd", loss="mean_squared_error")
 
     def agents_schema_router(self):
         pass
@@ -138,7 +144,6 @@ class Arbiter(object):
                 local_data_path = ''
                 for element_path in path:
                     local_data_path += '[' + element_path + ']'
-                print('data' + '[' + element_key.name + ']')
 
                 local_data = []
                 for element in data:
@@ -168,7 +173,11 @@ class Arbiter(object):
                         return_dict_max[element_key.name] = max(local_data)
                         return_dict[element_key.name] = normalize_list(local_data, max(local_data), min(local_data),
                                                                        1.0, -1.0)
-
+                    elif element_key.type == 'bool' and element_key.is_id == False:
+                        return_dict_min[element_key.name] = min(local_data)
+                        return_dict_max[element_key.name] = max(local_data)
+                        return_dict[element_key.name] = normalize_list(local_data, max(local_data), min(local_data),
+                                                                       1.0, -1.0, element_key.type)
                     elif element_key.is_id == False:
                         print('!!!!!!!!!!!!!!!!!!!!!!')
                         print(element_key.type)
@@ -221,11 +230,13 @@ class Arbiter(object):
                                                                          [], target='source')
             self.target_min = l_min
             self.target_max = l_max
-
-        for i in range(max_len):
+        source_data_schema = list(local_bundle_bucket['source'].keys())
+        for i in range(len(local_bundle_bucket['source'][source_data_schema[0]])):
             local_row = []
             source_data_schema = list(local_bundle_bucket['source'].keys())
-            local_row.append(source_ids[i])
+            for j in range(int(len(source_ids) / len(self.bundle_bucket))):
+                local_row.append(source_ids[i + j])
+
             for k in source_data_schema:
                 local_row.append(local_bundle_bucket['source'][k][i])
             source = DataCollection(data_size=len(local_row), data_schema=self.bundle_bucket[0].source.data_schema,
@@ -316,7 +327,6 @@ class Arbiter(object):
         elif self.tagrte_type == REGRESSION:
             class_num = 1
         for agent_result, y in zip(agent_results, target):
-            print('type(agent_result)', type(agent_result))
             local_arr_x = []
             if type(agent_result) != list:
                 x_fit.append(np.array(0))
@@ -358,12 +368,14 @@ class Arbiter(object):
             local_x.append(local_predictions[key])
         for x in local_x:
             if x is None:
-                local_x += [0]
+                local_arr_x += [0] * self.input_arbiter_len
             else:
-                local_arr_x += [x]
+                if type(x) == type(np.zeros(1)):
+                    x = x.tolist()
+                local_arr_x += x
 
         if self.skip_arbiter:
-            return None, np.array([local_arr_x])
+            return np.array([local_arr_x]), None
         local_arr_x = np.squeeze(local_arr_x)
         result = self.arbiter_neural_model.predict(np.array([local_arr_x]))
 
@@ -391,7 +403,6 @@ class Arbiter(object):
         if self.tagrte_type == REGRESSION_CATEGORY:
             pred_indedx = np.argmax(pred, axis=1).tolist()[0]
 
-            print("pred_indedx", pred_indedx, '-', images['target'])
             if pred_indedx == images['target']:
                 correct_count += 1
             else:
@@ -424,7 +435,7 @@ class Arbiter(object):
     def denormalize(self, data):
         if type(data) is not type([]):
             data = list(self.target_min.values())[0] + data * (
-                        list(self.target_max.values())[0] - list(self.target_min.values())[0])
+                    list(self.target_max.values())[0] - list(self.target_min.values())[0])
             return data
 
     def submit(self, file_dest=''):
@@ -439,16 +450,20 @@ class Arbiter(object):
         writer.writerow(local_arr)
         for image in self.bundle_bucket:
 
-            pred_indedx, _ = self.predict(image)
+            results, _ = self.predict(image)
 
-            _ = np.squeeze(_)
-            _ = self.denormalize(_)
+            results = np.squeeze(results)
+            results = self.denormalize(results)
             local_arr = []
             try:
-                local_arr.append(image.source.get_by_name('id'))
+                local_id = image.source.get_by_name('event_id')
+                if local_id == None:
+                    local_id = ''
+                local_arr.append(local_id)
             except Exception as e:
                 pass
-            local_arr.append(_)
+            for element in [*results]:
+                local_arr.append(element)
             writer.writerow(local_arr)
 
         writer.writerow([])

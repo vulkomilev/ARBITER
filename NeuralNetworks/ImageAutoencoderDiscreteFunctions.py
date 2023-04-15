@@ -10,6 +10,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import matplotlib.animation as animation
 from multiprocessing import Process,Pipe
 import cv2
+from utils.utils import normalize_list,one_hot,DataUnit
 import copy
 last_img = np.zeros((100,1))
 #last_img = np.zeros((12,8,3))
@@ -88,36 +89,36 @@ class CVAE(tf.keras.Model):
 
 
 class ImageAutoencoderDiscreteFunctions(Agent):
-    def __init__(self, inputs, outputs,  data_schema_input, data_schema_output, class_num):
+    def __init__(self, ):
         self.model = None
         self.func_map = {}
         self.optimizer = tf.keras.optimizers.Adam(1e-4)
-        self.data_schema_input = data_schema_input
-        self.init_neural_network(inputs, outputs, data_schema_input, latent_dim=(2000), class_num=class_num)  # 8*4*3
+        self.reg_input = [
+            DataUnit('str', (), None, 'Id', is_id=True),
+            DataUnit('2D_F', (1, 64, 64, 3), None, 'Image'),
+            ]
+        self.reg_output = [
+            DataUnit('str', (), None, 'Id', is_id=True),
+            DataUnit('2D_F', (64, 64), None, 'Image')
+        ]
+        self.local_image_list = []
+        self.init_neural_network( latent_dim=(2000))  # 8*4*3
         self.calc_map_plot_counter = 0
         self.confusion_matrix = {}
         self.func_arr = [[],[]]
         conn1, conn2 = Pipe()
         self.conn_send = conn2
-        p = Process(target=runGraph, args=(conn1,))
-        p.start()
+        #p = Process(target=runGraph, args=(conn1,))
+        #p.start()
 
-    def init_neural_network(self, inputs, outputs, data_schema, latent_dim, class_num):
-        local_input = inputs[0]
-        self.local_output = outputs[0]
+    def register(self,arbiter):
+        arbiter.register_neural_network(self,self.reg_input,self.reg_output)
+
+    def init_neural_network(self, latent_dim):
         self.latent_dim = latent_dim
-        for element in data_schema:
-            if element.name  == local_input:
-                local_input = element
-                break
-        if local_input.type == 'int':
-            width_img = local_input.data
-            height_img = 1
-            depth_img = 1
-        elif local_input.type == '2D_F':
-            width_img = local_input.shape[0]
-            height_img = local_input.shape[1]
-            depth_img = 3
+        width_img = self.reg_input[1].shape[1]
+        height_img = self.reg_input[1].shape[2]
+        depth_img = 3
         def custom_func(inputs):
 
             inputs /= 2
@@ -170,10 +171,10 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         images_collection = {}
 
         for image in images:
-
-            local_image = image.get_by_name('Image')
-            local_id = image.get_by_name('Id')
-
+            print(image)
+            local_image = image.source.get_by_name('Image')
+            local_id = str(image.source.get_by_name('sensor_id'))
+            print(local_id)
             # plt.imshow(local_image)
             # plt.show()
             if local_id[:8] not in images_collection.keys():
@@ -200,10 +201,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             local_x_train_arr.append(
          np.array(np.float32(local_image)))  # self.contur_image(local_image)
 
-            for data in image.data_collection:
-                if data.name == 'Id':
-                    local_data = data.data
-                    break
+
 
             local_y_train_arr.append( np.array(np.float32(local_image_output/255)) )
 
@@ -223,7 +221,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         return self.decode(eps, apply_sigmoid=True)
 
     def encode(self, x_img):
-        mean, logvar = tf.split(self.encoder(inputs=np.array([x_img])), num_or_size_splits=2, axis=1)
+        mean, logvar = tf.split(self.encoder(inputs=np.array(x_img)), num_or_size_splits=2, axis=1)
         return mean, logvar
 
     def encode_ord_dense(self, x_img, x_type):
@@ -259,7 +257,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         mean = self.custom_function_1(mean)
         z = self.reparameterize(mean, logvar)
         x_logit = self.decode(z)
-        cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=[y])
+        cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=y)
         logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
         logpz = self.log_normal_pdf(z, 0., 0.)
         logqz_x =  self.log_normal_pdf(z, mean, logvar)
@@ -268,7 +266,8 @@ class ImageAutoencoderDiscreteFunctions(Agent):
     def train(self, images, force_train=False):
         global  last_img
         print('loaded images',images)
-        x_train, y_train, func_name = self.prepare_data(images, in_train=True)
+        self.local_image_list+=images
+        x_train, y_train, func_name = self.prepare_data(self.local_image_list, in_train=True)
         print('prepare_data',np.array(x_train).shape)
 
         for x, y in zip(x_train, y_train):

@@ -1,6 +1,6 @@
 from arbiter import Arbiter
 from utils.utils import DataUnit
-from utils.utils import REGRESSION, CATEGORY,IMAGE,STRING
+from utils.utils import REGRESSION, CATEGORY, IMAGE, STRING
 import importlib
 
 print('Loading images ...')
@@ -403,56 +403,6 @@ data_schema_output = {
 agent_router = [{'ImageAndData':{'inputs':['Image','Id','site_id','patient_id', 'image_id', 'laterality', 'view',
                                            'age', 'cancer', 'biopsy', 'invasive', 'BIRADS'],
                                'outputs':[{'name':'cancer','type':REGRESSION}]}}]
-                                                                         """
-data_schema_input = [
-                     DataUnit('int', (), None, 'id',is_id=True),
-                     DataUnit('int', (), None, 'CementComponent',is_id=False),
-                     DataUnit('float', (), None, 'BlastFurnaceSlag',is_id=False),
-                     DataUnit('float', (), None, 'FlyAshComponent',is_id=False),
-                     DataUnit('int', (), None, 'WaterComponent',is_id=False),
-                     DataUnit('float', (), None, 'SuperplasticizerComponent',is_id=False),
-                     DataUnit('float', (), None, 'CoarseAggregateComponent',is_id=False),
-                     DataUnit('float', (), None, 'FineAggregateComponent',is_id=False),
-                     DataUnit('int', (), None, 'AgeInDays',is_id=False)]
-
-data_schema_output = [
-                   DataUnit('int', (), None, 'id',is_id=True),
-                   DataUnit('float', (), None, 'Strength')]
-
-agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
-                               'outputs':[{'name':'Image','type':IMAGE}]}}]
-target_type = CATEGORY
-# MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
-def runner(dataset_path, train_name='train', restrict=True, \
-                                                                 size=10, target_name='letter', no_ids=False,
-                                                                 data_schema_input= data_schema_input,
-                                                                 data_schema_output = data_schema_output,
-                                                                 submit_file  = 'test',
-                                                                 train_file  = 'train',
-                                                                 split=True,THREAD_COUNT = 32,dir_tree=True,
-                                                                 utils_name = 'utils'):
-    print('from utils.' + utils_name + ' import image_loader')
-    exec('from utils.' + utils_name + ' import image_loader')
-    image_loader = importlib.import_module('utils.' + utils_name ,package='.').image_loader
-
-    image_collection_train, image_collection_test = image_loader(dataset_path
-                                                                 , train_name=train_file, restrict=restrict, \
-                                                                 size=200, target_name='letter', no_ids=False,
-                                                                 data_schema_input=data_schema_input,
-                                                                 data_schema_output=data_schema_output,
-                                                                 split=split,THREAD_COUNT_V = THREAD_COUNT,
-                                                                 dir_tree=dir_tree)
-    print('DATA COLLECTED')
-    arbiter = Arbiter(data_schema_input=data_schema_input,
-                      data_schema_output=data_schema_output, target_type=target_type, class_num=image_collection_train['num_classes'],
-                      router_agent=agent_router, skip_arbiter=True)
-    for element in image_collection_train['image_arr']:
-        arbiter.add_bundle_bucket(element)
-    arbiter.normalize_data_bundle()
-    for i in range(1):
-       arbiter.train( force_train=True, train_arbiter=False)
-    arbiter.save()
-    arbiter.empty_bucket()
     data_schema_input = [
         DataUnit('int', (), None, 'id', is_id=True),
         DataUnit('int', (), None, 'CementComponent', is_id=False),
@@ -467,13 +417,84 @@ def runner(dataset_path, train_name='train', restrict=True, \
     data_schema_output = [
         DataUnit('int', (), None, 'id', is_id=True),
         DataUnit('float', (), None, 'Strength')]
+        
+        
+    data_schema_input = [
+        DataUnit('str', (), None, 'Id', is_id=True),
+        DataUnit('2D_F', (1,64, 64,3), None, 'Image')
+        ]
+
+    data_schema_output = [
+        DataUnit('str', (), None, 'Id', is_id=True),
+        DataUnit('2D_F', (64, 64), None, 'Image')]
+                                                                         """
+
+data_schema_input = [
+    DataUnit('int', (), None, 'batch_id', is_id=True),
+    DataUnit('int', (), None, 'event_id', is_id=True),
+    DataUnit('int', (), None, 'first_pulse_index', is_id=False),
+    DataUnit('int', (), None, 'last_pulse_index', is_id=False),
+    DataUnit('float', (), None, 'azimuth', is_id=False),
+    DataUnit('float', (), None, 'zenith', is_id=False),
+    DataUnit('int', (), None, 'sensor_id', is_id=True),
+    DataUnit('int', (), None, 'time', is_id=False),
+    DataUnit('float', (), None, 'charge', is_id=False),
+    DataUnit('bool', (), None, 'auxiliary', is_id=False),
+]
+
+data_schema_output = [
+    DataUnit('int', (), None, 'event_id', is_id=True),
+    DataUnit('float', (), None, 'azimuth', is_id=False),
+    DataUnit('float', (), None, 'zenith', is_id=False)]
+
+agent_router = [{'DenseScrable': {'inputs': ['batch_id', 'event_id', 'first_pulse_index', 'last_pulse_index', 'azimuth',
+                                             'zenith', 'sensor_id', 'time', 'charge', 'auxiliary'],
+                                  'outputs': [{'name': 'event_id', 'type': 'int'},
+                                              {'name': 'azimuth', 'type': 'float'},
+                                              {'name': 'zenith', 'type': 'float'}
+
+                                              ]}}, {'ImageAndData': {}}]
+target_type = CATEGORY
+
+
+# MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
+def runner(dataset_path, train_name='train', restrict=True, \
+           size=10, target_name='letter', no_ids=False,
+           data_schema_input=data_schema_input,
+           data_schema_output=data_schema_output,
+           submit_file='test',
+           train_file='train',
+           split=True, THREAD_COUNT=32, dir_tree=True,
+           utils_name='utils'):
+    exec('from utils.' + utils_name + ' import image_loader')
+    image_loader = importlib.import_module('utils.' + utils_name, package='.').image_loader
+
+    image_collection_train, image_collection_test = image_loader(dataset_path
+                                                                 , train_name=train_file, restrict=restrict, \
+                                                                 size=200, target_name='letter', no_ids=False,
+                                                                 data_schema_input=data_schema_input,
+                                                                 data_schema_output=data_schema_output,
+                                                                 split=split, THREAD_COUNT_V=THREAD_COUNT,
+                                                                 dir_tree=dir_tree)
+    print('DATA COLLECTED')
+    arbiter = Arbiter(data_schema_input=data_schema_input,
+                      data_schema_output=data_schema_output, target_type=target_type,
+                      class_num=image_collection_train['num_classes'],
+                      router_agent=agent_router, skip_arbiter=False)
+    for element in image_collection_train['image_arr']:
+        arbiter.add_bundle_bucket(element)
+    arbiter.normalize_data_bundle()
+    for i in range(1):
+        arbiter.train(force_train=True, train_arbiter=False)
+    arbiter.save()
+    arbiter.empty_bucket()
 
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name=submit_file, restrict=restrict, \
                                                                  size=200, target_name='letter', no_ids=False,
                                                                  data_schema_input=data_schema_input,
                                                                  data_schema_output=data_schema_output,
-                                                                 split=split,THREAD_COUNT_V = THREAD_COUNT,
+                                                                 split=split, THREAD_COUNT_V=THREAD_COUNT,
                                                                  dir_tree=dir_tree)
     for element in image_collection_train['image_arr']:
         arbiter.add_bundle_bucket(element)

@@ -9,69 +9,45 @@ from matplotlib import pyplot
 from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES,CATEGORY
 
 from utils.Agent import *
-
+from utils.utils import normalize_list,one_hot,DataUnit
 
 class ImageAndData(Agent):
 
-    def __init__(self, local_inputs, local_outputs, data_schema_input, data_schema_output, class_num):
+    def __init__(self):
         self.model = None
-        local_input = None
-        data_schema_input = data_schema_input['train']
-        self.data_schema_output = data_schema_output
-        print('data_schema_input',data_schema_input)
-        for element in data_schema_input:
-            if element.name == 'image_data':
-               local_input = element
-        self.init_neural_network(local_input,local_outputs,data_schema_input,class_num)
+        self.local_bucket = []
+
+        self.reg_input = [
+            DataUnit('2D_F', (337,337,3), None, '', is_id=True),
+            DataUnit('int', (), None, '', is_id=True)
+        ]
+
+        self.reg_output = [
+            DataUnit('int', (), None, '', is_id=True),
+        DataUnit('int', (), None, '', is_id=False),]
+        self.init_neural_network()
+
         self.total_tested = 0
         self.good_tested = 0
-
-    def init_neural_network(self, inputs,outputs,data_schema,class_num):
+    def register(self,arbiter):
+        arbiter.register_neural_network(self,self.reg_input,self.reg_output)
+    def init_neural_network(self):
         #local_input = inputs[0]
-        self.local_output = outputs[0]
         class_num = 37
-        #self.local_output.type = CATEGORY
-        if self.local_output['type'] == REGRESSION:
-            self.num_classes = 1
-            loss = 'mean_squared_error'
-        elif self.local_output['type'] == REGRESSION_CATEGORY:
-            self.num_classes = 100
-            loss = 'categorical_crossentropy'
-        elif self.local_output['type'] == CATEGORY or self.local_output['type'] == 'str':
-            self.num_classes = class_num
-            loss = 'categorical_crossentropy'
-        elif self.local_output['type'] ==  'mean_squared_error':
-            loss = 'mean_squared_error'
-            self.num_classes = 1
+        self.num_classes = class_num
+        loss = 'categorical_crossentropy'
 
-        height_img = None
-        width_img = None
-        depth_img = None
-        if inputs.type == 'int':
-            width_img = inputs.data
-            height_img = 1
-            depth_img = 1
-        elif inputs.type == '2D_F':
-            width_img = inputs.shape[0]
-            height_img = inputs.shape[1]
-            depth_img = 3
 
         input_model = tf.keras.Input(shape=(337, 337,3))
-       # model_mid = preprocessing.Rescaling(1.0 / 255)(input_model)
-        #ResNet152V2  70%
+
         model_mid = tf.keras.applications.ResNet50(include_top=False,
                                                 weights='imagenet')(
             input_model)
 
-        #(height_img,width_img,channel,)
         model_mid = tf.keras.layers.AveragePooling2D()(model_mid)
-        #1.1000 -100
-        #2 0.2 0.4 0.3  1 0 1 0 1 1
-        #model_mid = tf.keras.layers.Dense(100, activation='relu')(model_mid)
-        #model_mid = tf.keras.layers.Dropout(0.1)(model_mid)
+
         model_mid = tf.keras.layers.Flatten()(model_mid)
-        #model_mid = tf.keras.layers.Dense(100, activation='relu')(model_mid)
-        model_mid = tf.keras.layers.Dense(self.num_classes, activation='softmax')(model_mid)# sum(37) = 1.0
+        model_mid = tf.keras.layers.Dense(self.num_classes, activation='softmax')(model_mid)
         self.model = tf.keras.Model(inputs=input_model, outputs=model_mid)
 
         self.model.layers[1].trainable = False
@@ -94,7 +70,7 @@ class ImageAndData(Agent):
         local_y_labels = []
 
         if not in_train:
-            local_image = images.get_by_name('image_data')
+            local_image = images.source.get_by_name('image_data')
             if local_image is None:
                 return []
             local_image = np.array(local_image)
@@ -169,8 +145,10 @@ class ImageAndData(Agent):
         return np.array(local_x_train_arr),np.array(local_y_train_arr)
 
     def train(self, images, force_train=False):
-
-        x_train, y_train = self.prepare_data(images, in_train=True)
+        self.local_bucket.append(images)
+        if len(self.local_bucket) < 100:
+            return
+        x_train, y_train = self.prepare_data(self.local_bucket, in_train=True)
         print(x_train.shape)
         print(y_train.shape)
 
