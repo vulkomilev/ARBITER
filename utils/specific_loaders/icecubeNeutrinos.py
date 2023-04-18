@@ -203,8 +203,7 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
     image_ids = None
     if Path(path).exists():
         data = pd.read_parquet(path +'train_meta.parquet', engine='fastparquet')
-
-
+        print('loaded train_meta.parquet')
         data = data.iloc[0:size].to_dict(orient='list')
         #exit(0)
         if restrict:
@@ -311,7 +310,7 @@ def worker_load_image_data_from_csv(args):
             local_id_poss.append(i)
 
     data = pd.read_parquet(parquet_dir, engine='fastparquet')
-    data = data.to_dict(orient='list')
+    data = data.iloc[0:cut_size].to_dict(orient='list')
     if restrict:
         for element in list(data.keys()):
             data[element] = data[element][:cut_size]

@@ -472,7 +472,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
 
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name=train_file, restrict=restrict, \
-                                                                 size=200, target_name='letter', no_ids=False,
+                                                                 size=size, target_name='letter', no_ids=False,
                                                                  data_schema_input=data_schema_input,
                                                                  data_schema_output=data_schema_output,
                                                                  split=split, THREAD_COUNT_V=THREAD_COUNT,
@@ -492,7 +492,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
 
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name=submit_file, restrict=restrict, \
-                                                                 size=200, target_name='letter', no_ids=False,
+                                                                 size=size, target_name='letter', no_ids=False,
                                                                  data_schema_input=data_schema_input,
                                                                  data_schema_output=data_schema_output,
                                                                  split=split, THREAD_COUNT_V=THREAD_COUNT,
