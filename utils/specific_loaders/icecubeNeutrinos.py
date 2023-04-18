@@ -410,7 +410,7 @@ def load_id_from_parquet(parquet_dir,  data_schema_input=None,data_schema_output
     for element in os.listdir(parquet_dir):
         file_paths.append(parquet_dir +'/'+element)
 
-
+    file_paths = file_paths[:10]
     print('len(data) >= THREAD_COUNT', len(file_paths) >= THREAD_COUNT, len(file_paths) )
     if len(file_paths) > THREAD_COUNT:
 
