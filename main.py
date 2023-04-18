@@ -454,7 +454,7 @@ agent_router = [{'DenseScrable': {'inputs': ['batch_id', 'event_id', 'first_puls
                                               {'name': 'azimuth', 'type': 'float'},
                                               {'name': 'zenith', 'type': 'float'}
 
-                                              ]}}, {'ImageAndData': {}}]
+                                              ]}}]
 target_type = CATEGORY
 
 
