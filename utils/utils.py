@@ -104,11 +104,7 @@ class DataCollection(object):
                                      data=element)
                 added_elements.append(schema_element.name)
                 data_element_collection.append(data_unit)
-            for element in self.data_schema:
-                if element.name == 'Image':
-                    data_unit = DataUnit(type_val=element.type,is_id=schema_element.is_id, shape=element.shape, name=element.name,
-                                         data=None)
-                    data_element_collection.append(data_unit)
+
 
             self.data_collection = data_element_collection
 
@@ -121,7 +117,6 @@ class DataCollection(object):
 
 def try_convert_float(f):
     try:
-        print(f)
         return float(f)
     except Exception as e:
         return 0.0
@@ -165,9 +160,6 @@ class DataUnit(object):
                     data = np.nan
                 else:
                     data = np.array(data, dtype=np.int)
-            # except:
-            #    print(type(data))
-            #    data = np.array(data, dtype=np.int)
 
             elif type_val == 'float':
                 if np.isnan(data):
@@ -215,7 +207,6 @@ def one_hot(string_list, element_key):
             local_entry = [0] * unique_str
             local_entry[unique_indentifier.index(element)] = 1
             one_hot_list.append(local_entry)
-        # print('len(one_hot_list)',len(one_hot_list))
         return one_hot_list
 
 
@@ -230,7 +221,7 @@ def find_image_by_name(img_name, path):
     local_path = ''
     img_name = str(img_name)
     img_name = img_name.replace('^', '')
-    # print(len(local_lib.keys()))
+
     if len(local_lib.keys()) == 0:
         for root, dirs, files in os.walk(path):
             for element in files:
@@ -239,15 +230,12 @@ def find_image_by_name(img_name, path):
     if img_name in list(local_lib.keys()):
 
         if len(local_lib[img_name]) > 0:
-            # print(local_lib)
             ds =  image.imread(local_lib[img_name])
 
             pixel_array_numpy = ds
             return pixel_array_numpy
 
     if len(local_path) > 0:
-        # if 'dcm' not in local_path:
-        #    local_path = local_path+'.dcm'
         ds = image.imread(local_path)
         pixel_array_numpy = ds
         return pixel_array_numpy
@@ -278,7 +266,6 @@ def is_float_arr(i):
 
 
 def normalize_list(local_list, max_val, min_val, target_max, target_min,type_in=None):
-    print('type',type)
     if type_in == 'bool':
         for i in range(len(local_list)):
             local_list[i] = int(local_list[i])
@@ -296,6 +283,8 @@ def normalize_list(local_list, max_val, min_val, target_max, target_min,type_in=
             local_list[i] = 0
     return local_list
 
+def normalize_image(image):
+    return image
 def flatten_list(xs):
     for x in xs:
         if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
@@ -467,7 +456,7 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
     image_ids = None
     if Path(path + train_name + '.csv').exists():
         if not dir_tree:
-            image_ids, loaded_ids_size = load_id_from_csv(path + train_name + '.csv',  data_schema_input,data_schema_output, restrict, size)
+            image_ids, loaded_ids_size = load_id_from_csv(path + train_name + '.csv',  data_schema_input,data_schema_output, restrict, size,path)
         else:
             image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input,data_schema_output, restrict, size)
     elif dir_tree:
@@ -533,8 +522,7 @@ def worker_load_image_data_from_dir_tree_csv(args):
     # global loaded_ids
     local_list, schema, cut_size, restrict, dir_path = args
 
-    # print(type(schema))
-    # print(type(cut_size))
+
     local_data_arr = {}
     # local_id_poss = []
     # for i,element in enumerate(schema):
@@ -548,7 +536,6 @@ def worker_load_image_data_from_dir_tree_csv(args):
         if os.path.exists(dir_path + element):
 
             for key in schema.keys():
-                print(os.path.exists(dir_path + element))
                 if os.path.isfile(dir_path + element):
                     if (key) not in schema_transformed.keys():
                         schema_transformed[key] = {}
@@ -588,33 +575,12 @@ def worker_load_image_data_from_dir_tree_csv(args):
                             schema_transformed[element + '/' + second_path][key][second_key.name].append(element_second)
 
     return schema_transformed
-    '''
-    for i in range(len(local_dict[list(local_dict.keys())[0]])):
-        local_row = []
-        for element in schema:
-            if element.name in list(local_dict.keys()):
-             local_row.append(local_dict[element.name][i])
-            else:
-                local_row.append(None)
-        local_norm_list.append(local_row)
-    for row in local_norm_list:
-        if len(row) == 0:
-            continue
-        try:
-            local_id_name = ''
-            for element in local_id_poss:
-                local_id_name += str(row[element]) + '^'
-            local_data_arr[local_id_name] = DataCollection(data_size=len(row), data_schema=schema, data=row)
-        except Exception as e:
-            print(e)
-            pass
-    return local_data_arr
-    '''
+
 
 
 def worker_load_image_data_from_csv(args):
     # global loaded_ids
-    local_dict, schema, cut_size, restrict = args
+    local_dict, schema, cut_size, restrict,path = args
     data_schema_input, data_schema_output = schema
     local_data_arr_input = {}
     local_norm_list_input = []
@@ -635,8 +601,8 @@ def worker_load_image_data_from_csv(args):
             if element.name in list(local_dict.keys()):
                 local_row.append(local_dict[element.name][i])
             elif element.type in DATA_FORMATS_SPECIAL:
-                local_row.append(np.resize(find_image_by_name(local_row[local_id_poss[0]],
-                                 './data_sets/abstraction-and-reasoning-challenge/image_train_small/'),element.shape))
+                local_row.append(np.resize(find_image_by_name(local_dict[list(local_dict.keys())[local_id_poss[0]-1]][i],
+                                 path),element.shape))
             else:
                 local_row.append(None)
         local_norm_list_input.append(local_row)
@@ -649,7 +615,6 @@ def worker_load_image_data_from_csv(args):
             continue
         try:
             local_id_name = ''
-            # print('local_id_poss',local_id_poss)
             for element in local_id_poss:
                 local_id_name += str(row[element]) + '^'
             local_data_arr_input[local_id_name] = DataCollection(data_size=len(row), data_schema=data_schema_input, data=row)
@@ -678,7 +643,6 @@ def worker_load_image_data_from_csv(args):
             continue
         try:
             local_id_name = ''
-            # print('local_id_poss',local_id_poss)
             for element in local_id_poss:
                 local_id_name += str(row[element]) + '^'
             local_data_arr_output[local_id_name] = DataCollection(data_size=len(row), data_schema=data_schema_output, data=row)
@@ -710,7 +674,6 @@ def load_id_from_dir_tree_csv(dir_path, data_schema, restrict=False, size=100):
             size = [len(id_list[0])] * THREAD_COUNT
             dir_path = [dir_path] * THREAD_COUNT
         restrict = [restrict] * THREAD_COUNT
-        print('id_list', type(id_list))
         with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
             futures = [executor.submit(worker_load_image_data_from_dir_tree_csv, args) for args in
                        zip(id_list, data_schema, size,
@@ -726,7 +689,7 @@ def load_id_from_dir_tree_csv(dir_path, data_schema, restrict=False, size=100):
     return local_ids, loaded_ids_size
 
 
-def load_id_from_csv(csv_path,  data_schema_input=None,data_schema_output=None, restrict=False, size=100):
+def load_id_from_csv(csv_path,  data_schema_input=None,data_schema_output=None, restrict=False, size=100,path=''):
     local_ids = {}
     data = pd.read_csv(csv_path, low_memory=False)
     csv_reader = data.to_dict(orient='list')
@@ -746,18 +709,17 @@ def load_id_from_csv(csv_path,  data_schema_input=None,data_schema_output=None, 
             size = [size] * THREAD_COUNT
         else:
             size = [len(id_list[0])] * THREAD_COUNT
-        print('id_list', type(id_list))
         with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
             futures = [executor.submit(worker_load_image_data_from_csv, args) for args in
                        zip(id_list, data_schema[csv_path[csv_path.rindex('/') + 1:csv_path.rindex('.')]], size,
-                           restrict)]
+                           restrict,path)]
             print("THREAD COUNT:", len(futures))
             results = [f.result() for f in futures]
 
     else:
 
         results = worker_load_image_data_from_csv(
-            (csv_reader, (data_schema_input,data_schema_output), size, restrict))
+            (csv_reader, (data_schema_input,data_schema_output), size, restrict,path))
     loaded_ids_size = len(local_ids)
     return results, loaded_ids_size
 

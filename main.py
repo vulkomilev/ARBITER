@@ -429,6 +429,7 @@ agent_router = [{'ImageAndData':{'inputs':['Image','Id','site_id','patient_id', 
         DataUnit('2D_F', (64, 64), None, 'Image')]
                                                                          """
 
+
 data_schema_input = [
     DataUnit('int', (), None, 'batch_id', is_id=True),
     DataUnit('int', (), None, 'event_id', is_id=True),
@@ -484,7 +485,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
     for element in image_collection_train['image_arr']:
         arbiter.add_bundle_bucket(element)
     arbiter.normalize_data_bundle()
-    for i in range(1):
+    for i in range(10):
         arbiter.train(force_train=True, train_arbiter=False)
     arbiter.save()
     arbiter.empty_bucket()

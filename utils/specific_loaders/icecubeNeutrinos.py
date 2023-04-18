@@ -203,7 +203,10 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
     image_ids = None
     if Path(path).exists():
         data = pd.read_parquet(path +'train_meta.parquet', engine='fastparquet')
-        data = data.to_dict(orient='list')
+
+
+        data = data.iloc[0:size].to_dict(orient='list')
+        #exit(0)
         if restrict:
             for element in list(data.keys()):
                 data[element] = data[element][:size]
@@ -343,14 +346,12 @@ def worker_load_image_data_from_csv(args):
             continue
         try:
             local_id_name = ''
-            # print('local_id_poss',local_id_poss)
             for element in local_id_poss:
                 local_id_name += str(row[element]) + '^'
             local_data_arr_input[local_id_name] = DataCollection(data_size=len(row), data_schema=data_schema_input, data=row)
 
         except Exception as e:
            pass
-#////////////////////////////////
     local_id_poss = []
     for i, element in enumerate(data_schema_output):
         if element.is_id:
@@ -365,7 +366,6 @@ def worker_load_image_data_from_csv(args):
             continue
         try:
             local_id_name = ''
-            # print('local_id_poss',local_id_poss)
             for element in local_id_poss:
                 local_id_name += str(row[element]) + '^'
             local_data_arr_output[local_id_name] = DataCollection(data_size=len(row), data_schema=data_schema_output, data=row)
@@ -397,7 +397,6 @@ def load_id_from_dir_tree_csv(dir_path,  data_schema_input=None,data_schema_outp
             size = [len(id_list[0])] * THREAD_COUNT
             dir_path = [dir_path] * THREAD_COUNT
         restrict = [restrict] * THREAD_COUNT
-        print('id_list', type(id_list))
 
     else:
 
@@ -411,9 +410,6 @@ def load_id_from_parquet(parquet_dir,  data_schema_input=None,data_schema_output
     file_paths = []
     for element in os.listdir(parquet_dir):
         file_paths.append(parquet_dir +'/'+element)
-        #data = pd.read_parquet(parquet_dir +element, engine='fastparquet')
-        #data = data.to_dict(orient='list')
-        #print(list(data.keys()))
 
 
     print('len(data) >= THREAD_COUNT', len(file_paths) >= THREAD_COUNT, len(file_paths) )
@@ -431,7 +427,6 @@ def load_id_from_parquet(parquet_dir,  data_schema_input=None,data_schema_output
             size = [size] * THREAD_COUNT
         else:
             size = [len(id_list[0])] * THREAD_COUNT
-        print('id_list', type(id_list))
         restrict = [restrict]*THREAD_COUNT
         meta_data = [meta_data]*THREAD_COUNT
         with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:

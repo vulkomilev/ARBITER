@@ -95,7 +95,9 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         self.optimizer = tf.keras.optimizers.Adam(1e-4)
         self.reg_input = [
             DataUnit('str', (), None, 'Id', is_id=True),
-            DataUnit('2D_F', (1, 64, 64, 3), None, 'Image'),
+            DataUnit('2D_F', (64,64), None, 'Image'),
+
+
             ]
         self.reg_output = [
             DataUnit('str', (), None, 'Id', is_id=True),
@@ -116,8 +118,8 @@ class ImageAutoencoderDiscreteFunctions(Agent):
 
     def init_neural_network(self, latent_dim):
         self.latent_dim = latent_dim
-        width_img = self.reg_input[1].shape[1]
-        height_img = self.reg_input[1].shape[2]
+        width_img = self.reg_input[1].shape[0]
+        height_img = self.reg_input[1].shape[1]
         depth_img = 3
         def custom_func(inputs):
 
@@ -171,12 +173,10 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         images_collection = {}
 
         for image in images:
-            print(image)
+
             local_image = image.source.get_by_name('Image')
-            local_id = str(image.source.get_by_name('sensor_id'))
-            print(local_id)
-            # plt.imshow(local_image)
-            # plt.show()
+            local_id = str(image.source.get_by_name('Id'))
+
             if local_id[:8] not in images_collection.keys():
                 images_collection[local_id[:8]] = {'input': None, 'output': None}
             if 'input' in local_id:
@@ -191,19 +191,12 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             local_image_output = images_collection[local_key]['output']
             if type(local_image_output) == type(None) or type(local_image_input) == type(None):
                 continue
-            local_image = local_image_input/255   # np.concatenate((local_image_input, local_image_output), axis=0)
+            local_image = copy.deepcopy(local_image_input)   # np.concatenate((local_image_input, local_image_output), axis=0)
 
-            if local_image is None:
-                continue
-            if len(local_image.shape) == 2:
-                local_image = np.expand_dims(local_image, axis=1)
-                image.set_by_name('Image', local_image)
             local_x_train_arr.append(
-         np.array(np.float32(local_image)))  # self.contur_image(local_image)
+         np.array(np.resize(np.float32(local_image),(1,64,64,3))))  # self.contur_image(local_image)
 
-
-
-            local_y_train_arr.append( np.array(np.float32(local_image_output/255)) )
+            local_y_train_arr.append( np.array(np.resize(np.float32(local_image_output), (1, 64, 64, 3))))
 
         return np.array(local_x_train_arr), np.array(local_y_train_arr), np.array(local_target_train_arr)
 
@@ -266,7 +259,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
     def train(self, images, force_train=False):
         global  last_img
         print('loaded images',images)
-        self.local_image_list+=images
+        self.local_image_list.append(images)
         x_train, y_train, func_name = self.prepare_data(self.local_image_list, in_train=True)
         print('prepare_data',np.array(x_train).shape)
 

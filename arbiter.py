@@ -2,7 +2,7 @@ import csv
 import datetime
 import numpy as np
 import tensorflow as tf
-from utils.utils import normalize_list, one_hot, DataUnit, DataCollection, DataBundle, DataInd
+from utils.utils import normalize_list, one_hot, DataUnit, DataCollection, DataBundle, DataInd,normalize_image
 from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES, try_convert_float
 
 from NeuralNetworks.DenseScrable import DenseScrable
@@ -78,40 +78,56 @@ class Arbiter(object):
     def init_neural_network(self):
         input_list = []
         output_len = 0
+        for i in range(len(list( self.registered_networks.keys()))):
+            for element in self.data_schema_output:
+                if not element.is_id:
+                    if element.shape == ():
+                        input_list.append(1)
+                    else:
+                        input_list.append(element.shape)
 
-        for element in self.data_schema_output:
-            if not element.is_id:
-                if element.shape == ():
-                    input_list.append(1)
-                else:
-                    input_list.append(element.shape)
-
-        for element in self.data_schema_output:
-            if not element.is_id:
-                if element.shape == ():
-                    input_list.append(1)
-                else:
-                    input_list.append(element.shape)
 
         for element in self.data_schema_output:
             if not element.is_id:
                 if element.shape == ():
                     output_len += 1
-                else:
-                    output_len += element.shape
+                elif type(element.shape) ==  type((1,2)):
+                    output_len = element.shape
 
-        self.input_arbiter_len = output_len
-        self.arbiter_neural_network_input = tf.keras.Input(len(input_list))
-        layer_size = len(input_list)
-        self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
-            self.arbiter_neural_network_input)
-        layer_size = len(input_list) / 2.0
-        while layer_size > 1:
-            self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
+        self.input_arbiter_len = input_list
+        if type(self.input_arbiter_len) == type((1, 2)):
+
+            self.arbiter_neural_network_input = tf.keras.Input(shape=self.input_arbiter_len)
+            layer_size = len(input_list)
+            self.arbiter_neural_network = tf.keras.layers.Flatten()(self.arbiter_neural_network_input)
+            self.arbiter_neural_network = tf.keras.layers.Dense(sum(input_list))(self.arbiter_neural_network_input)
+            self.arbiter_neural_network = tf.keras.layers.Dense(sum(input_list))(self.arbiter_neural_network_input)
+            self.arbiter_neural_network = tf.keras.layers.Dense(sum(input_list)/2)(self.arbiter_neural_network_input)
+            tf.keras.layers.Conv2DTranspose(
+                filters=30, kernel_size=[int(i/2) for i in input_list], strides=1, padding='same',
+                activation='relu'),
+            self.arbiter_neural_network = tf.keras.layers.Conv2DTranspose(sum(input_list))(self.arbiter_neural_network_input)
+
+            self.arbiter_neural_network = tf.keras.layers.Dense(sum(input_list))(self.arbiter_neural_network_input)
+            layer_size = len(input_list) / 2.0
+            while layer_size > 1:
+                self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
+                    self.arbiter_neural_network)
+                layer_size = layer_size / 2.0
+
+            self.arbiter_neural_network = tf.keras.layers.Dense(output_len)( \
                 self.arbiter_neural_network)
-            layer_size = layer_size / 2.0
-        self.arbiter_neural_network = tf.keras.layers.Dense(output_len)( \
-            self.arbiter_neural_network)
+        else:
+            self.arbiter_neural_network_input = tf.keras.Input(len(input_list))
+            layer_size = len(input_list)
+            self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
+                self.arbiter_neural_network_input)
+            layer_size = len(input_list) / 2.0
+            while layer_size > 1:
+                self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
+                    self.arbiter_neural_network)
+                layer_size = layer_size / 2.0
+
         self.arbiter_neural_model = tf.keras.Model(inputs=self.arbiter_neural_network_input,
                                                    outputs=self.arbiter_neural_network)
         self.arbiter_neural_model.compile(optimizer="sgd", loss="mean_squared_error")
@@ -178,8 +194,11 @@ class Arbiter(object):
                         return_dict_max[element_key.name] = max(local_data)
                         return_dict[element_key.name] = normalize_list(local_data, max(local_data), min(local_data),
                                                                        1.0, -1.0, element_key.type)
+                    elif element_key.type == '2D_F' and element_key.is_id == False:
+
+                        return_dict[element_key.name] = normalize_image(local_data)
                     elif element_key.is_id == False:
-                        print('!!!!!!!!!!!!!!!!!!!!!!')
+                        print('!!!!!!!!!!ERROR DATA NOMRALIZATION!!!!!!!!!!!!')
                         print(element_key.type)
                         exit(0)
 
@@ -368,7 +387,7 @@ class Arbiter(object):
             local_x.append(local_predictions[key])
         for x in local_x:
             if x is None:
-                local_arr_x += [0] * self.input_arbiter_len
+                local_arr_x += [0]*int(len(self.input_arbiter_len)/len(list( self.registered_networks.keys())))
             else:
                 if type(x) == type(np.zeros(1)):
                     x = x.tolist()
