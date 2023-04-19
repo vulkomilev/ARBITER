@@ -488,9 +488,14 @@ class Arbiter(object):
             for element in [*results]:
                 local_arr.append(element)
             for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
+                if element == 'event_id':
+                    arr_element = int(arr_element)
+
                 local_dict[element].append(arr_element)
             #writer.writerow(local_arr)
+
         df = DataFrame.from_dict(local_dict)
-        df.to_parquet(file_dest + 'submission.csv')
+
+        df.to_parquet(file_dest + 'submission.parquet')
         #writer.writerow([])
         #f.close()
