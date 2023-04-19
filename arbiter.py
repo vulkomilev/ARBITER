@@ -4,7 +4,8 @@ import numpy as np
 import tensorflow as tf
 from utils.utils import normalize_list, one_hot, DataUnit, DataCollection, DataBundle, DataInd,normalize_image
 from utils.utils import REGRESSION, REGRESSION_CATEGORY, IMAGE, TIME_SERIES, try_convert_float
-
+import pyarrow.parquet as pq
+from  pandas import DataFrame
 from NeuralNetworks.DenseScrable import DenseScrable
 from NeuralNetworks.CellularAutomataAndData import CellularAutomataAndData
 from NeuralNetworks.ImageAutoencoderDiscreteFunctions import ImageAutoencoderDiscreteFunctions
@@ -459,14 +460,17 @@ class Arbiter(object):
 
     def submit(self, file_dest=''):
         f = open(file_dest + 'submission.csv', 'w+')
-        writer = csv.writer(f)
+        #writer = csv.writer(f)
         local_arr = []
+        local_dict ={}
         if type(self.data_schema_output) is list:
             for element in self.data_schema_output:
                 local_arr.append(element.name)
         else:
             local_arr = self.get_schema_names(self.data_schema_output)
-        writer.writerow(local_arr)
+        for element in self.get_schema_names(self.data_schema_output):
+            local_dict[element] = []
+        #writer.writerow(local_arr)
         for image in self.bundle_bucket:
 
             results, _ = self.predict(image)
@@ -483,7 +487,10 @@ class Arbiter(object):
                 pass
             for element in [*results]:
                 local_arr.append(element)
-            writer.writerow(local_arr)
-
-        writer.writerow([])
-        f.close()
+            for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
+                local_dict[element].append(arr_element)
+            #writer.writerow(local_arr)
+        df = DataFrame.from_dict(local_dict)
+        df.to_parquet(file_dest + 'submission.csv')
+        #writer.writerow([])
+        #f.close()
