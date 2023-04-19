@@ -10,6 +10,7 @@ from utils.utils import DataCollection, DataUnit,DataBundle,DataInd
 import cv2
 import numpy as np
 import pandas as pd
+import pyarrow
 
 IMAGE_WIDTH = 256
 IMAGE_HEIGHT = 256
@@ -302,7 +303,10 @@ def worker_load_image_data_from_csv(args):
         if element.is_id:
             local_id_poss.append(i)
     print(parquet_dir)
-    data = pd.read_parquet(parquet_dir)
+    arrow_dataset = pyarrow.parquet.ParquetDataset(parquet_dir)
+    arrow_table = arrow_dataset.read()
+    pandas_df = arrow_table.to_pandas()
+    data =pandas_df#pd.read_parquet(parquet_dir)
     data = data.iloc[0:cut_size].to_dict(orient='list')
     if restrict:
         for element in list(data.keys()):
@@ -432,7 +436,7 @@ def load_id_from_parquet(parquet_dir,  data_schema_input=None,data_schema_output
         id_list = []
         for local_key in list(file_paths):
             id_list.append(local_key)
-            id_list.append(local_key)
+
         results = worker_load_image_data_from_csv((id_list, (data_schema_input,data_schema_output), size,
                            restrict,meta_data))
     loaded_ids_size = len(local_ids)
