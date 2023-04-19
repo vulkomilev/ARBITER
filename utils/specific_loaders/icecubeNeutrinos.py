@@ -301,7 +301,7 @@ def worker_load_image_data_from_csv(args):
     for i, element in enumerate(data_schema_input):
         if element.is_id:
             local_id_poss.append(i)
-
+    print(parquet_dir)
     data = pd.read_parquet(parquet_dir)
     data = data.iloc[0:cut_size].to_dict(orient='list')
     if restrict:
@@ -431,6 +431,7 @@ def load_id_from_parquet(parquet_dir,  data_schema_input=None,data_schema_output
     else:
         id_list = []
         for local_key in list(file_paths):
+            id_list.append(local_key)
             id_list.append(local_key)
         results = worker_load_image_data_from_csv((id_list, (data_schema_input,data_schema_output), size,
                            restrict,meta_data))

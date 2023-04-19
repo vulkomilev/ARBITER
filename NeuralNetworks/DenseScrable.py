@@ -2,7 +2,13 @@ from utils.utils import normalize_list, one_hot, DataUnit
 from utils.Agent import *
 import datetime
 
-
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+  try:
+    tf.config.experimental.set_virtual_device_configuration(
+        gpus[0],[tf.config.experimental.VirtualDeviceConfiguration(memory_limit=2048)])
+  except RuntimeError as e:
+    print(e)
 class DenseScrable(Agent):
 
     def __init__(self):
@@ -158,6 +164,7 @@ class DenseScrable(Agent):
     def predict(self, image):
 
         x_train, y_train = self.prepare_data([image], in_train=True)
+        print(x_train)
         _ = self.model.predict(x_train)
 
         return abs(_[0])
