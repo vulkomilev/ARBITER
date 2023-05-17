@@ -1,3 +1,5 @@
+import numpy as np
+
 from utils.utils import normalize_list, one_hot, DataUnit
 from utils.Agent import *
 import datetime
@@ -15,31 +17,26 @@ if gpus:
         print(e)
 class DenseScrable(Agent):
 
-    def __init__(self):
+    def __init__(self,input_dict,output_dict):
         self.model = None
-        self.init_neural_network()
+
         self.total_tested = 0
         self.good_tested = 0
         self.local_bucket = []
+        self.reg_input = []
+        self.reg_output = []
+        for element in input_dict:
+         if element.shape == ():
+             self.reg_input.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
+        for element in output_dict:
+         if element.shape == ():
+             self.reg_output.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
+        #self.reg_output = [
+        #    DataUnit('int', (), None, '', is_id=True),
+        #    DataUnit('float', (), None, '', is_id=False),
+        #    DataUnit('float', (), None, '', is_id=False)]
 
-        self.reg_input = [
-            DataUnit('int', (), None, '', is_id=True),
-            DataUnit('int', (), None, '', is_id=True),
-            DataUnit('int', (), None, '', is_id=False),
-            DataUnit('int', (), None, '', is_id=False),
-            DataUnit('float', (), None, '', is_id=False),
-            DataUnit('float', (), None, '', is_id=False),
-            DataUnit('int', (), None, '', is_id=True),
-            DataUnit('int', (), None, '', is_id=False),
-            DataUnit('float', (), None, '', is_id=False),
-            DataUnit('bool', (), None, '', is_id=False),
-        ]
-
-        self.reg_output = [
-            DataUnit('int', (), None, '', is_id=True),
-            DataUnit('float', (), None, '', is_id=False),
-            DataUnit('float', (), None, '', is_id=False)]
-
+        self.init_neural_network()
     def register(self, arbiter):
         arbiter.register_neural_network(self, self.reg_input, self.reg_output)
 
@@ -59,9 +56,9 @@ class DenseScrable(Agent):
 
     def init_neural_network(self):
 
-        input_model = tf.keras.Input(shape=(7))
+        input_model = tf.keras.Input(shape=(6))
 
-        model_mid = tf.keras.layers.Dense((7))(input_model)
+        model_mid = tf.keras.layers.Dense((6))(input_model)
         model_mid = tf.keras.layers.Dense((12))(model_mid)
         model_mid = tf.keras.layers.Dense((6))(model_mid)
         model_mid = tf.keras.layers.Dense((3))(model_mid)
@@ -123,30 +120,44 @@ class DenseScrable(Agent):
                     local_element = element.source.get_by_name(second_element.name)
                     if local_element == None:
                         local_element = 0
-                    local_list.append(local_element)
-            local_data_input.append(local_list)
+                    if len(np.array(local_element).shape) == 0:
+                     continue
+                    else:
+                     local_list.append(np.array(local_element).tolist())
+
+            local_list = np.swapaxes(np.array(local_list),1,0)
+            local_list = local_list.tolist()
+            local_data_input+=local_list
         local_data_output = []
         for element in data:
             local_list = []
             for second_element in self.reg_output:
                 if len(second_element.name) > 0:
                     local_list.append(element.source.get_by_name(second_element.name))
-            local_data_output.append(local_list)
+            local_list = np.swapaxes(np.array(local_list), 1, 0)
+            local_list = local_list.tolist()
+            local_data_output+=local_list
+
         normalized_data_input = local_data_input
         normalized_data_output = local_data_output
 
-        normalized_data_input = np.array(self.unlist(normalized_data_input))
+        #normalized_data_input = np.array(self.unlist(normalized_data_input))
         normalized_data_output = np.array(self.unlist(normalized_data_output))
+        #print(normalized_data_input)
 
-        norm_arr_x = normalized_data_input
+        #print(np.array(normalized_data_input).shape)
+        norm_arr_x = normalized_data_input #np.array(normalized_data_input).tolist()
 
         norm_arr_y = normalized_data_output
 
         return norm_arr_x, norm_arr_y
 
-    def train(self, images, force_train=False):
-        self.local_bucket.append(images)
+    def train(self, images, force_train=False,only_fill=False):
+        if images != None:
+            self.local_bucket.append(images)
         if len(self.local_bucket) < 100:
+            return
+        if only_fill:
             return
         x_train, y_train = self.prepare_data(self.local_bucket, in_train=True)
 
@@ -157,8 +168,8 @@ class DenseScrable(Agent):
         if Path('./checkpoints/' + ckpt_name).exists() and not force_train:
             self.model = tf.keras.models.load_model('./checkpoints/' + ckpt_name)
         else:
-
-            self.model.fit(x_train, y_train, batch_size=32, epochs=30, validation_split=0.1)
+            #exit(0)
+            self.model.fit(np.array(x_train), np.array(y_train), batch_size=32, epochs=1)#, validation_split=0.1)
             self.model.save('./checkpoints/' + ckpt_name)
         self.local_bucket = []
 
@@ -168,7 +179,6 @@ class DenseScrable(Agent):
     def predict(self, image):
 
         x_train, y_train = self.prepare_data([image], in_train=True)
-        print(x_train)
         _ = self.model.predict(x_train)
 
         return abs(_[0])

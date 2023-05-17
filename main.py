@@ -370,13 +370,14 @@ agent_router = [{'DenseScrable':{'inputs':['seq_id','protein_sequence',
                                'outputs':[{'name':'seq_id','type':'int'},
                                           {'name':'tm','type':'float'}]}}]
 
+
 data_schema_input = [
-                     DataUnit('2D_F', (64,64), None, 'Image'),
+                     DataUnit('2D_F', (32,32,3), None, 'Image'),
                      DataUnit('str', (), None, 'Id',is_id=True)]
 
 data_schema_output = [
                    DataUnit('str', (), None, 'Id',is_id=True),
-                   DataUnit('2D_F', (64,64), None, 'Image')]
+                   DataUnit('2D_F', (32,32,3), None, 'Image')]
 #tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
 agent_router = [{'ImageAutoencoderDiscreteFunctions':{'inputs':['Image','Id'],
                                'outputs':[{'name':'Image','type':IMAGE}]}}]
@@ -427,8 +428,7 @@ agent_router = [{'ImageAndData':{'inputs':['Image','Id','site_id','patient_id', 
     data_schema_output = [
         DataUnit('str', (), None, 'Id', is_id=True),
         DataUnit('2D_F', (64, 64), None, 'Image')]
-                                                                         """
-
+                                                                       
 
 data_schema_input = [
     DataUnit('int', (), None, 'batch_id', is_id=True),
@@ -455,9 +455,78 @@ agent_router = [{'DenseScrable': {'inputs': ['batch_id', 'event_id', 'first_puls
                                               {'name': 'zenith', 'type': 'float'}
 
                                               ]}}]
+                                              data_schema_input =     {
+        'defog':[
+        DataUnit('float', (), None, 'Time',is_id=True),
+        DataUnit('float', (), None, 'AccV'),
+        DataUnit('float', (), None, 'AccML'),
+        DataUnit('float', (), None, 'AccAP'),
+        DataUnit('float', (), None, 'StartHesitation'),
+        DataUnit('float', (), None, 'Turn'),
+        DataUnit('float', (), None, 'Walking'),
+        DataUnit('bool', (), None, 'Valid'),
+        DataUnit('bool', (), None, 'Task')],
+        'notype': [
+            DataUnit('float', (), None, 'Time',is_id=True),
+            DataUnit('float', (), None, 'AccV'),
+            DataUnit('float', (), None, 'AccML'),
+            DataUnit('float', (), None, 'AccAP'),
+            DataUnit('float', (), None, 'Event'),
+            DataUnit('bool', (), None, 'Valid'),
+            DataUnit('bool', (), None, 'Task')],
+        'tdcsfog': [
+            DataUnit('float', (), None, 'Time',is_id=True),
+            DataUnit('float', (), None, 'AccV'),
+            DataUnit('float', (), None, 'AccML'),
+            DataUnit('float', (), None, 'AccAP'),
+            DataUnit('float', (), None, 'StartHesitation'),
+            DataUnit('float', (), None, 'Turn'),
+            DataUnit('float', (), None, 'Walking')]
+    }
+
+data_schema_output = [
+    DataUnit('float', (), None, 'StartHesitation'),
+    DataUnit('float', (), None, 'Turn'),]
+
+agent_router = [{'DenseScrable': ''}]
+                                                """
+
 target_type = CATEGORY
 
+data_schema_input =     {
+        'defog':[
+        DataUnit('float', (), None, 'Time',is_id=True),
+        DataUnit('float', (), None, 'AccV'),
+        DataUnit('float', (), None, 'AccML'),
+        DataUnit('float', (), None, 'AccAP'),
+        DataUnit('float', (), None, 'StartHesitation'),
+        DataUnit('float', (), None, 'Turn'),
+        DataUnit('float', (), None, 'Walking'),
+        DataUnit('bool', (), None, 'Valid'),
+        DataUnit('bool', (), None, 'Task')],
+        'notype': [
+            DataUnit('float', (), None, 'Time',is_id=True),
+            DataUnit('float', (), None, 'AccV'),
+            DataUnit('float', (), None, 'AccML'),
+            DataUnit('float', (), None, 'AccAP'),
+            DataUnit('float', (), None, 'Event'),
+            DataUnit('bool', (), None, 'Valid'),
+            DataUnit('bool', (), None, 'Task')],
+        'tdcsfog': [
+            DataUnit('float', (), None, 'Time',is_id=True),
+            DataUnit('float', (), None, 'AccV'),
+            DataUnit('float', (), None, 'AccML'),
+            DataUnit('float', (), None, 'AccAP'),
+            DataUnit('float', (), None, 'StartHesitation'),
+            DataUnit('float', (), None, 'Turn'),
+            DataUnit('float', (), None, 'Walking')]
+    }
 
+data_schema_output = [
+    DataUnit('float', (), None, 'StartHesitation'),
+    DataUnit('float', (), None, 'Turn'),]
+
+agent_router = [{'DenseScrable': ''}]
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
 def runner(dataset_path, train_name='train', restrict=True, \
            size=10, target_name='letter', no_ids=False,
@@ -482,9 +551,13 @@ def runner(dataset_path, train_name='train', restrict=True, \
                       data_schema_output=data_schema_output, target_type=target_type,
                       class_num=image_collection_train['num_classes'],
                       router_agent=agent_router, skip_arbiter=False)
-    for element in image_collection_train['image_arr']:
-        arbiter.add_bundle_bucket(element)
-    arbiter.normalize_data_bundle()
+    #print(type(image_collection_train['image_arr']))
+    #print(image_collection_train['image_arr'][0])
+    #exit(0)
+    for key in list(image_collection_train['image_arr'].keys()):
+        arbiter.add_bundle_bucket(key,image_collection_train['image_arr'][key])
+    #print(image_collection_train)
+    arbiter.normalize_bundle_bucket()
     for i in range(10):
         arbiter.train(force_train=True, train_arbiter=False)
     arbiter.save()
@@ -497,7 +570,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
                                                                  data_schema_output=data_schema_output,
                                                                  split=split, THREAD_COUNT_V=THREAD_COUNT,
                                                                  dir_tree=dir_tree)
-    for element in image_collection_train['image_arr']:
-        arbiter.add_bundle_bucket(element)
-    arbiter.normalize_data_bundle(is_submit=True)
+    for key in list(image_collection_train['image_arr'].keys())[:100]:
+        arbiter.add_bundle_bucket(key,image_collection_train['image_arr'][key])
+    arbiter.normalize_bundle_bucket(is_submit=True)
     arbiter.submit('/kaggle/working/')

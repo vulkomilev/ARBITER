@@ -1,18 +1,16 @@
 import concurrent.futures
 import copy
 import json
+import math
 import os
 import random
-import math
-from pathlib import Path
 from collections.abc import Iterable
+from pathlib import Path
 
 import cv2
 import numpy as np
 import pandas as pd
-import pydicom
 from matplotlib import image
-from pydicom.pixel_data_handlers.util import apply_voi_lut
 
 IMAGE_WIDTH = 256
 IMAGE_HEIGHT = 256
@@ -23,7 +21,7 @@ index_csv = {}
 
 IMAGE_EXTS_LIST = ['jpg', 'png']
 DATA_FORMATS_SPECIAL = ['2D_F', '2D_INT']
-DATA_FORMATS = ['float', 'int', 'str', 'date','bool'] + DATA_FORMATS_SPECIAL
+DATA_FORMATS = ['float', 'int', 'str', 'date', 'bool'] + DATA_FORMATS_SPECIAL
 REGRESSION_CATEGORY = 'int'
 REGRESSION = 'float'
 CATEGORY = 'Category'
@@ -33,6 +31,9 @@ IMAGE = '2D_F'
 TARGET_TYPES = [REGRESSION, REGRESSION_CATEGORY, CATEGORY, TIME_SERIES, IMAGE]
 HEURISTICS = {}
 local_lib = {}
+
+GLOBAL_DATA = {}
+GLOBAL_ID_DATA = {}
 
 
 class DataCollection(object):
@@ -69,17 +70,22 @@ class DataCollection(object):
                 self.data_collection[i].data = copy.deepcopy(val)
                 return
 
-    def get_dict(self,include_only_id=False):
+    def set_by_dict(self, input_dict):
+        for i, element in enumerate(self.data_collection):
+            if element.name in list(input_dict.keys()):
+                self.data_collection[i].data = copy.deepcopy(input_dict[element.name])
+
+    def get_dict(self, include_only_id=False):
 
         return_dict = {}
 
         for element in self.data_collection:
             if not include_only_id:
                 if not element.is_id:
-                 return_dict[element.name] = element.data
+                    return_dict[element.name] = element.data
             else:
                 if element.is_id:
-                 return_dict[element.name] = element.data
+                    return_dict[element.name] = element.data
         return return_dict
 
     def add_data(self, data):
@@ -87,7 +93,8 @@ class DataCollection(object):
             data_element_collection = []
             added_elements = []
             for schema_element, element in zip(self.data_schema, data):
-                data_unit = DataUnit(type_val=schema_element.type,is_id=schema_element.is_id, shape=schema_element.shape, name=schema_element.name,
+                data_unit = DataUnit(type_val=schema_element.type, is_id=schema_element.is_id,
+                                     shape=schema_element.shape, name=schema_element.name,
                                      data=data[schema_element.name])
                 added_elements.append(schema_element.name)
                 data_element_collection.append(data_unit)
@@ -96,15 +103,14 @@ class DataCollection(object):
             if len(data) == 0:
                 return
 
-                # assert (len(data_element) == self.data_size)
             data_element_collection = []
             added_elements = []
             for schema_element, element in zip(self.data_schema, data):
-                data_unit = DataUnit(type_val=schema_element.type,is_id=schema_element.is_id, shape=schema_element.shape, name=schema_element.name,
+                data_unit = DataUnit(type_val=schema_element.type, is_id=schema_element.is_id,
+                                     shape=schema_element.shape, name=schema_element.name,
                                      data=element)
                 added_elements.append(schema_element.name)
                 data_element_collection.append(data_unit)
-
 
             self.data_collection = data_element_collection
 
@@ -135,9 +141,11 @@ class DataBundle(object):
         self.target = target
         self.data_ind = data_ind
 
+
 class ModelIOReg(object):
-    def __init__(self,data_list):
-        self.data_list =data_list
+    def __init__(self, data_list):
+        self.data_list = data_list
+
 
 class DataUnit(object):
 
@@ -155,7 +163,6 @@ class DataUnit(object):
             if type_val == 'str':
                 data = str(data)
             elif type_val == 'int':
-                # try:
                 if np.isnan(data).any():
                     data = np.nan
                 else:
@@ -178,7 +185,6 @@ def one_hot(string_list, element_key):
     unique_indentifier = list(set(string_list))
     if len(unique_indentifier) > 250 and element_key.break_seq == False:
         return []
-    # exit(0)
     if element_key.break_seq:
         return_arr = []
         local_alphabet = []
@@ -216,6 +222,7 @@ def contur_image(img):
     contur_img = cv2.Sobel(src=blur_img, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=5)
     return contur_img
 
+
 def find_image_by_name(img_name, path):
     global local_lib
     local_path = ''
@@ -230,7 +237,7 @@ def find_image_by_name(img_name, path):
     if img_name in list(local_lib.keys()):
 
         if len(local_lib[img_name]) > 0:
-            ds =  image.imread(local_lib[img_name])
+            ds = image.imread(local_lib[img_name])[:, :, :3]
 
             pixel_array_numpy = ds
             return pixel_array_numpy
@@ -239,6 +246,7 @@ def find_image_by_name(img_name, path):
         ds = image.imread(local_path)
         pixel_array_numpy = ds
         return pixel_array_numpy
+
 
 def is_int(i):
     try:
@@ -265,7 +273,7 @@ def is_float_arr(i):
         return False
 
 
-def normalize_list(local_list, max_val, min_val, target_max, target_min,type_in=None):
+def normalize_list(local_list, max_val, min_val, target_max, target_min, type_in=None):
     if type_in == 'bool':
         for i in range(len(local_list)):
             local_list[i] = int(local_list[i])
@@ -283,8 +291,11 @@ def normalize_list(local_list, max_val, min_val, target_max, target_min,type_in=
             local_list[i] = 0
     return local_list
 
+
 def normalize_image(image):
     return image
+
+
 def flatten_list(xs):
     for x in xs:
         if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
@@ -393,7 +404,6 @@ def split_list(target_list, count, restrict=False, size=1000):
         splited_list[i].append(element)
 
     if restrict:
-
         for i in range(len(splited_list)):
             random_start = random.randint(0, len(splited_list[i]) - (size + 1))
             splited_list[i] = splited_list[i][random_start:random_start + size]
@@ -445,9 +455,9 @@ def image_loader_json_images(path, restrict=False, size=1000):
     return results
 
 
-
 def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=False,
-                 load_image=False, target_name=None, data_schema_input=None,data_schema_output=None, split=False, split_coef=0.9, THREAD_COUNT_V=32,
+                 load_image=False, target_name=None, data_schema_input=None, data_schema_output=None, split=False,
+                 split_coef=0.9, THREAD_COUNT_V=32,
                  dir_tree=False):
     global THREAD_COUNT
     global train_df, valid_df
@@ -456,11 +466,14 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
     image_ids = None
     if Path(path + train_name + '.csv').exists():
         if not dir_tree:
-            image_ids, loaded_ids_size = load_id_from_csv(path + train_name + '.csv',  data_schema_input,data_schema_output, restrict, size,path)
+            image_ids, loaded_ids_size = load_id_from_csv(path + train_name + '.csv', data_schema_input,
+                                                          data_schema_output, restrict, size, path)
         else:
-            image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input,data_schema_output, restrict, size)
+            image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input, data_schema_output,
+                                                                   restrict, size)
     elif dir_tree:
-        image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input,data_schema_output, restrict, size)
+        image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input, data_schema_output, restrict,
+                                                               size)
     print('csv load done')
     local_image_collection = {'num_classes': 0, 'image_arr': []}
     if size < len(image_paths):
@@ -471,116 +484,190 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
             image_paths_list.append([element])
 
     if split:
-        test_arr = []
-        train_arr = []
+        test_arr = {}
+        train_arr = {}
         train_cutoff = int(split_coef * len(local_image_collection['image_arr']))
-        # FIX THIS
         if not load_image:
             key_list = list(image_ids.keys())
             random.shuffle(key_list)
             train_cutoff = int(split_coef * len(key_list))
             for i in range(0, train_cutoff):
-                train_arr.append(image_ids[key_list[i]])
+                train_arr[key_list[i]] = image_ids[key_list[i]]
             for i in range(train_cutoff, len(key_list)):
-                test_arr.append(image_ids[key_list[i]])
-            random.shuffle(train_arr)
-            random.shuffle(test_arr)
+                test_arr[key_list[i]] = image_ids[key_list[i]]
+
             return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}, \
                    {'num_classes': local_image_collection['num_classes'], 'image_arr': test_arr}
         else:
             for i in range(0, train_cutoff):
-                train_arr.append(local_image_collection['image_arr'][i])
+                train_arr = local_image_collection['image_arr'][i]
             for i in range(train_cutoff, len(local_image_collection['image_arr'])):
-                test_arr.append(local_image_collection['image_arr'][i])
-            random.shuffle(train_arr)
-            random.shuffle(test_arr)
+                test_arr = local_image_collection['image_arr'][i]
+
             return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}, \
                    {'num_classes': local_image_collection['num_classes'], 'image_arr': test_arr}
     else:
-        train_arr = []
-        # FIX THIS
+        train_arr = {}
 
         train_cutoff = int(len(local_image_collection['image_arr']))
         if not load_image:
-            key_list = list(image_ids)
-            random.shuffle(key_list)
-            train_cutoff = int(len(key_list))
-            for i in range(0, train_cutoff):
-                train_arr.append(image_ids[i])
-            random.shuffle(train_arr)
-            return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}, {
-                'num_classes': local_image_collection['num_classes'], 'image_arr': []}
+            if type(image_ids) == type({}):
+                key_list = list(image_ids.keys())
+                random.shuffle(key_list)
+                train_cutoff = int(len(key_list))
+                for i in range(0, train_cutoff):
+                    train_arr[key_list[i]] = (image_ids[key_list[i]])
+                return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}, {
+                    'num_classes': local_image_collection['num_classes'], 'image_arr': []}
+            elif type(image_ids) == type([]):
+                random.shuffle(image_ids)
+                train_cutoff = int(len(image_ids))
+                for i in range(0, train_cutoff):
+                    train_arr[i] = (image_ids[i])
+                return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}, {
+                    'num_classes': local_image_collection['num_classes'], 'image_arr': []}
         else:
+            key_list = list(image_ids.keys())
+            random.shuffle(key_list)
             for i in range(0, train_cutoff):
-                train_arr.append(local_image_collection['image_arr'][i])
+                train_arr[image_ids[i]] = (image_ids[key_list[i]])
 
-            random.shuffle(train_arr)
             return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}, {
                 'num_classes': local_image_collection['num_classes'], 'image_arr': []}
+
+
+def generate_path_list_from_dict(input_dict, key_list, return_list, is_first=True):
+    if type(input_dict) == type({}):
+        if not is_first:
+            for key in list(input_dict.keys()):
+                generate_path_list_from_dict(input_dict[key], key_list + [key], return_list, is_first=False)
+        else:
+            local_return_list = []
+            for key in list(input_dict.keys()):
+                generate_path_list_from_dict(input_dict[key], key_list + [key], local_return_list, is_first=False)
+            return local_return_list
+    else:
+        return_list.append(key_list)
+
+
+def get_data_by_list(input_dict, key_list):
+    if type(input_dict) != type({}):
+        return input_dict
+    if len(key_list) > 0:
+        return get_data_by_list(input_dict[key_list[0]], key_list[1:])
+    return input_dict
+
+
+def data_bundle_and_path(input_dict):
+    local_path_list = generate_path_list_from_dict(input_dict, [], [], True)
+    return_path_list = []
+    return_template = []
+    if local_path_list == None:
+        return_template = input_dict
+        return [return_template], [[]]
+    for element in local_path_list:
+        return_template.append(get_data_by_list(input_dict, element))
+        return_path_list.append(element)
+    return return_template, return_path_list
+
+
+def set_data_by_list(input_dict, key_list, data):
+    if len(key_list) > 1:
+        get_data_by_list(input_dict[key_list[0]], key_list[1:])
+    else:
+        if len(key_list) == 0:
+            input_dict.set_by_dict(data)
+        else:
+            input_dict[key_list[0]].set_by_dict(data)
+
+
+def add_dict_path_recs(target_dict, target_list, data):
+    if len(target_list) > 1:
+        add_dict_path_recs(target_dict[target_list[0]], target_list[1:], data)
+        return
+    if type(target_dict[target_list[0]]) == type({}):
+        target_dict[target_list[0]] = []
+
+    target_dict[target_list[0]] += data
+
+
+def create_dict_path_recs(target_dict, target_list):
+    if len(target_list) == 0:
+        return
+    if target_list[0] not in list(target_dict.keys()):
+        if len(target_list) <= 1:
+            target_dict[target_list[0]] = []
+            return
+        else:
+            target_dict[target_list[0]] = {}
+            create_dict_path_recs(target_dict, target_list[1:])
+    if type(target_dict[target_list[0]]) == type([]):
+        if len(target_dict[target_list[0]]) > 0:
+            return
+        target_dict[target_list[0]] = {}
+    create_dict_path_recs(target_dict[target_list[0]], target_list[1:])
+
 
 def worker_load_image_data_from_dir_tree_csv(args):
-    # global loaded_ids
+    global GLOBAL_DATA
     local_list, schema, cut_size, restrict, dir_path = args
-
+    data_schema_input, data_schema_output = schema
 
     local_data_arr = {}
-    # local_id_poss = []
-    # for i,element in enumerate(schema):
-    #    if element.is_id:
-    #        local_id_poss.append(i)
+
     if restrict:
         if cut_size != -1:
             local_list = local_list[:cut_size]
     schema_transformed = {}
     for element in local_list:
+        element_tree = element.split('/')
+        print('==============')
+        create_dict_path_recs(GLOBAL_DATA, element_tree[:1])
         if os.path.exists(dir_path + element):
-
-            for key in schema.keys():
-                if os.path.isfile(dir_path + element):
-                    if (key) not in schema_transformed.keys():
-                        schema_transformed[key] = {}
-
-                    for local_data_unit in schema[key]:
-                        if local_data_unit.name not in schema_transformed[key].keys():
-                            schema_transformed[key][local_data_unit.name] = []
-                else:
-                    for second_path in os.listdir(dir_path + element):
-                        if (element + '/' + second_path) not in schema_transformed.keys():
-                            schema_transformed[element + '/' + second_path] = {}
-                        for key in schema.keys():
-                            if key not in schema_transformed[element + '/' + second_path].keys():
-                                schema_transformed[element + '/' + second_path][key] = {}
-                            for local_data_unit in schema[key]:
-                                if local_data_unit.name not in schema_transformed[element + '/' + second_path][
-                                    key].keys():
-                                    schema_transformed[element + '/' + second_path][key][local_data_unit.name] = []
-    local_norm_list = []
-    for key in schema.keys():
-
-        if os.path.isfile(dir_path + key + '.csv'):
-
-            df = pd.read_csv(dir_path + key + '.csv')
+            df = pd.read_csv(dir_path + element)
             local_dict = df.to_dict()
-            for second_key in schema[key]:
-                for element_second in local_dict[second_key.name].values():
-                    schema_transformed[key][second_key.name].append(element_second)
-        else:
-            for element in local_list:
-                for second_path in os.listdir(dir_path + element):
+            for element in list(local_dict.keys()):
+                create_dict_path_recs(GLOBAL_DATA, element_tree[:1] + [element])
+            for element in list(local_dict.keys()):
+                try:
+                    add_dict_path_recs(GLOBAL_DATA, element_tree[:1] + [element], list(local_dict[element].values()))
+                except Exception as e:
+                    print(e)
+                    exit(0)
+    return
 
-                    df = pd.read_csv(dir_path + element + '/' + second_path + '/' + key + '.csv')
-                    local_dict = df.to_dict()
-                    for second_key in schema[key]:
-                        for element_second in local_dict[second_key.name].values():
-                            schema_transformed[element + '/' + second_path][key][second_key.name].append(element_second)
 
-    return schema_transformed
+def map_schema_data_rec(data, schema, path):
+    return_dict = {}
+    if type(schema) == type({}):
+        for key in list(schema.keys()):
+            return_dict[key] = map_schema_data_rec(data[key], schema[key], path)
+        return return_dict
+    else:
+        row = []
+        for element in schema:
+            if element.name in list(data.keys()):
+                row.append(data[element.name])
+            elif element.type in DATA_FORMATS_SPECIAL:
+                row.append(
+                    np.resize(find_image_by_name(data[element.name],
+                                                 path), element.shape))
+            else:
+                row.append(None)
+        return DataCollection(data_size=len(row), data_schema=schema, data=row)
 
+
+def worker_load_image_data_from_csv_tree(args):
+    local_dict, schema, cut_size, restrict, path = args
+    data_schema_input, data_schema_output = schema
+    input = map_schema_data_rec(local_dict, data_schema_input, path)
+    target = map_schema_data_rec(local_dict, data_schema_output, path)
+    return DataBundle(data_ind=DataInd(timestamp='00000', cat_subcat='00000', model_sign='00000'), source=input,
+                      target=target)
 
 
 def worker_load_image_data_from_csv(args):
-    # global loaded_ids
-    local_dict, schema, cut_size, restrict,path = args
+    local_dict, schema, cut_size, restrict, path = args
     data_schema_input, data_schema_output = schema
     local_data_arr_input = {}
     local_norm_list_input = []
@@ -601,8 +688,10 @@ def worker_load_image_data_from_csv(args):
             if element.name in list(local_dict.keys()):
                 local_row.append(local_dict[element.name][i])
             elif element.type in DATA_FORMATS_SPECIAL:
-                local_row.append(np.resize(find_image_by_name(local_dict[list(local_dict.keys())[local_id_poss[0]-1]][i],
-                                 path),element.shape))
+                local_row.append(find_image_by_name(local_dict[list(local_dict.keys())[local_id_poss[0] - 1]][i],
+                                                    path))
+
+
             else:
                 local_row.append(None)
         local_norm_list_input.append(local_row)
@@ -617,11 +706,11 @@ def worker_load_image_data_from_csv(args):
             local_id_name = ''
             for element in local_id_poss:
                 local_id_name += str(row[element]) + '^'
-            local_data_arr_input[local_id_name] = DataCollection(data_size=len(row), data_schema=data_schema_input, data=row)
+            local_data_arr_input[local_id_name] = DataCollection(data_size=len(row), data_schema=data_schema_input,
+                                                                 data=row)
 
         except Exception as e:
-           pass
-#////////////////////////////////
+            pass
     local_id_poss = []
     for i, element in enumerate(data_schema_output):
         if element.is_id:
@@ -645,24 +734,88 @@ def worker_load_image_data_from_csv(args):
             local_id_name = ''
             for element in local_id_poss:
                 local_id_name += str(row[element]) + '^'
-            local_data_arr_output[local_id_name] = DataCollection(data_size=len(row), data_schema=data_schema_output, data=row)
+            local_data_arr_output[local_id_name] = DataCollection(data_size=len(row), data_schema=data_schema_output,
+                                                                  data=row)
 
         except Exception as e:
             pass
-    data_bundle_list  = []
-    for input,target in zip(local_data_arr_input.values(),local_data_arr_output.values()):
-        data_bundle_list.append(DataBundle(data_ind=DataInd(timestamp='00000', cat_subcat='00000', model_sign='00000'),source=input,target=target))
+    data_bundle_list = []
+    for input, target in zip(local_data_arr_input.values(), local_data_arr_output.values()):
+        data_bundle_list.append(
+            DataBundle(data_ind=DataInd(timestamp='00000', cat_subcat='00000', model_sign='00000'), source=input,
+                       target=target))
     return data_bundle_list
 
 
-def load_id_from_dir_tree_csv(dir_path, data_schema, restrict=False, size=100):
+def list_files(startpath, dir_path):
+    return_list = []
+    for root, dirs, files in os.walk(startpath):
+
+        for f in files:
+            return_list.append('{}/{}'.format(root.replace(dir_path, ''), f))
+    return return_list
+
+
+def add_recursive(data, path, dict_add):
+    if path[0] not in list(dict_add.keys()):
+
+        if len(path) > 1:
+            dict_add[path[0]] = {}
+        else:
+            dict_add[path[0]] = None
+
+    if len(path) > 1:
+        add_recursive(data, path[1:], dict_add[path[0]])
+    else:
+
+        dict_add[path[0]] = data
+
+
+def fill_global_id_data(args):
+    local_ids, local_data, array_ids, average_len, j, back_keys = args
+    for i in range(len(array_ids[j * average_len:j * average_len + average_len])):
+
+        print(i, '/', len(array_ids))
+        for local_key in list(local_data.keys()):
+            add_recursive(local_data[local_key][i], [array_ids[average_len * j + i]] + back_keys + [local_key],
+                          GLOBAL_ID_DATA)
+
+
+def recursiv_match(input_dict, data_schema, key=''):
+    global GLOBAL_ID_DATA
+    if type(data_schema) == type({}):
+        for second_key in list(data_schema.keys()):
+            if second_key in list(input_dict.keys()):
+                recursiv_match(input_dict[second_key], data_schema[second_key], key=key + [second_key])
+
+    if type(data_schema) == type([]):
+        array_id = None
+        local_dict = {}
+        for local_key in list(data_schema):
+            if local_key.is_id:
+                array_id = input_dict[local_key.name]
+
+        id_list_ordered = split_list(target_list=array_id, count=THREAD_COUNT, restrict=False, size=100)
+        input_dict_splited = [input_dict] * THREAD_COUNT
+        array_id_splited = [array_id] * THREAD_COUNT
+        average_len = [len(id_list_ordered)] * THREAD_COUNT
+        back_keys = [key] * THREAD_COUNT
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
+            futures = [executor.submit(fill_global_id_data, args) for args in
+                       zip(id_list_ordered, input_dict_splited, array_id_splited, average_len,
+                           range(len(id_list_ordered)), back_keys)]
+            results = [f.result() for f in futures]
+
+
+def load_id_from_dir_tree_csv(dir_path, data_schema_input, data_schema_output, restrict=False, size=100):
     local_ids = {}
-    data = os.listdir(dir_path)
+    data = list_files(dir_path, dir_path)
 
     if len(data) >= THREAD_COUNT:
         id_list = []
         id_list_ordered = split_list(target_list=data, count=THREAD_COUNT, restrict=restrict, size=size)
-        data_schema = [data_schema] * THREAD_COUNT
+        data_schema = [(data_schema_input, data_schema_output)] * THREAD_COUNT
 
         for i in range(THREAD_COUNT):
             id_list.append(id_list_ordered[i])
@@ -680,16 +833,25 @@ def load_id_from_dir_tree_csv(dir_path, data_schema, restrict=False, size=100):
                            restrict, dir_path)]
             print("THREAD COUNT:", len(futures))
             results = [f.result() for f in futures]
-        for element in results:
-            local_ids = {**local_ids, **element}
+        recursiv_match(GLOBAL_DATA, data_schema_input, [])
+        return_list = {}
+        for key in list(GLOBAL_ID_DATA.keys()):
+            return_list[key] = worker_load_image_data_from_csv_tree(
+                (GLOBAL_ID_DATA[key], (data_schema_input, data_schema_output), 100, False, ''))
+        return return_list, len(return_list)
+
+
+
+
     else:
 
-        local_ids = worker_load_image_data_from_dir_tree_csv((data, data_schema, size, restrict, dir_path))
+        local_ids = worker_load_image_data_from_dir_tree_csv(
+            (data, (data_schema_input, data_schema_output), size, restrict, dir_path))
     loaded_ids_size = len(local_ids.keys())
     return local_ids, loaded_ids_size
 
 
-def load_id_from_csv(csv_path,  data_schema_input=None,data_schema_output=None, restrict=False, size=100,path=''):
+def load_id_from_csv(csv_path, data_schema_input=None, data_schema_output=None, restrict=False, size=100, path=''):
     local_ids = {}
     data = pd.read_csv(csv_path, low_memory=False)
     csv_reader = data.to_dict(orient='list')
@@ -697,7 +859,7 @@ def load_id_from_csv(csv_path,  data_schema_input=None,data_schema_output=None, 
     if len(csv_reader) > THREAD_COUNT:
 
         id_dict = split_dict(target_dict=csv_reader, count=THREAD_COUNT, restrict=restrict, size=size)
-        data_schema = [(data_schema_input,data_schema_output)] * THREAD_COUNT
+        data_schema = [(data_schema_input, data_schema_output)] * THREAD_COUNT
         id_list = []
         for i in range(THREAD_COUNT):
             local_dict = {}
@@ -712,14 +874,14 @@ def load_id_from_csv(csv_path,  data_schema_input=None,data_schema_output=None, 
         with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
             futures = [executor.submit(worker_load_image_data_from_csv, args) for args in
                        zip(id_list, data_schema[csv_path[csv_path.rindex('/') + 1:csv_path.rindex('.')]], size,
-                           restrict,path)]
+                           restrict, path)]
             print("THREAD COUNT:", len(futures))
             results = [f.result() for f in futures]
 
     else:
 
         results = worker_load_image_data_from_csv(
-            (csv_reader, (data_schema_input,data_schema_output), size, restrict,path))
+            (csv_reader, (data_schema_input, data_schema_output), size, restrict, path))
     loaded_ids_size = len(local_ids)
     return results, loaded_ids_size
 

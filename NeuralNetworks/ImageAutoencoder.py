@@ -123,9 +123,9 @@ class ImageAutoencoder(Agent):
         self.encoder = tf.keras.Sequential([
             tf.keras.layers.InputLayer(input_shape=(width_img, height_img, depth_img)),
             tf.keras.layers.Conv2D(
-                filters=3, kernel_size=3, strides=(2, 2), activation='relu'),
+                filters=6, kernel_size=3, strides=(2, 2), activation='relu'),
             tf.keras.layers.Conv2D(
-                filters=3, kernel_size=3, strides=(2, 2), activation='relu'),
+                filters=6, kernel_size=3, strides=(2, 2), activation='relu'),
             tf.keras.layers.Flatten(),
             tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu'),
             tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu'),

@@ -13,8 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Keras base class for convolution layers."""
-
-
+import tensorflow
 import tensorflow.compat.v2 as tf
 
 from keras import activations
@@ -24,7 +23,7 @@ from keras import regularizers
 from keras.engine.base_layer import Layer
 from keras.engine.input_spec import InputSpec
 from keras.utils import conv_utils
-
+import sys
 
 class ConvSymb(Layer):
     """Abstract N-D convolution layer (private, used as implementation base).
@@ -87,6 +86,8 @@ class ConvSymb(Layer):
         rank,
         filters,
         custom_function,
+
+        kernel_size,
         strides=1,
         padding="valid",
         data_format=None,
@@ -94,9 +95,12 @@ class ConvSymb(Layer):
         groups=1,
         activation=None,
         use_bias=True,
+        kernel_initializer="glorot_uniform",
         bias_initializer="zeros",
+        kernel_regularizer=None,
         bias_regularizer=None,
         activity_regularizer=None,
+        kernel_constraint=None,
         bias_constraint=None,
         trainable=True,
         name=None,
@@ -120,6 +124,9 @@ class ConvSymb(Layer):
             )
         self.filters = filters
         self.groups = groups or 1
+        self.kernel_size = conv_utils.normalize_tuple(
+            kernel_size, rank, "kernel_size"
+        )
         self.custom_function =custom_function
         self.strides = conv_utils.normalize_tuple(
             strides, rank, "strides", allow_zero=True
@@ -133,8 +140,12 @@ class ConvSymb(Layer):
         self.activation = activations.get(activation)
         self.use_bias = use_bias
 
+
+        self.kernel_initializer = initializers.get(kernel_initializer)
         self.bias_initializer = initializers.get(bias_initializer)
+        self.kernel_regularizer = regularizers.get(kernel_regularizer)
         self.bias_regularizer = regularizers.get(bias_regularizer)
+        self.kernel_constraint = constraints.get(kernel_constraint)
         self.bias_constraint = constraints.get(bias_constraint)
         self.input_spec = InputSpec(min_ndim=self.rank + 2)
 
@@ -174,7 +185,23 @@ class ConvSymb(Layer):
                     "Causal padding is only supported for `Conv1D`"
                     "and `SeparableConv1D`."
                 )
+    def convolution_op(self, inputs, kernel):
+        if self.padding == "causal":
+            tf_padding = "VALID"  # Causal padding handled in `call`.
+        elif isinstance(self.padding, str):
+            tf_padding = self.padding.upper()
+        else:
+            tf_padding = self.padding
 
+        return tf.nn.convolution(
+            inputs,
+            kernel,
+            strides=list(self.strides),
+            padding=tf_padding,
+            dilations=list(self.dilation_rate),
+            data_format=self._tf_data_format,
+            name=self.__class__.__name__,
+        )
     def build(self, input_shape):
         input_shape = tf.TensorShape(input_shape)
         input_channel = self._get_input_channel(input_shape)
@@ -186,12 +213,23 @@ class ConvSymb(Layer):
                     self.groups, input_channel, input_shape
                 )
             )
-
+        kernel_shape = self.kernel_size + (
+            input_channel // self.groups,
+            self.filters,
+        )
 
         # compute_output_shape contains some validation logic for the input
         # shape, and make sure the output shape has all positive dimensions.
         self.compute_output_shape(input_shape)
-
+        self.kernel = self.add_weight(
+            name="kernel",
+            shape=kernel_shape,
+            initializer=self.kernel_initializer,
+            regularizer=self.kernel_regularizer,
+            constraint=self.kernel_constraint,
+            trainable=True,
+            dtype=self.dtype,
+        )
         if self.use_bias:
             self.bias = self.add_weight(
                 name="bias",
@@ -219,9 +257,16 @@ class ConvSymb(Layer):
 
         if self._is_causal:  # Apply causal padding to inputs for Conv1D.
             inputs = tf.pad(inputs, self._compute_causal_padding(inputs))
+        if inputs.shape[3]:
+            #print(inputs[:,:,:,:3])#tf.math.greater(inputs[:,:,:,:3], [0, 0.5, 0]))
+            outputs = self.custom_function(inputs[:,:,:,:3])
 
-        outputs = self.custom_function(inputs)
+        else:
+            outputs_1 = self.custom_function(inputs[:, :, :, :3])
+            outputs_2 = self.custom_function(inputs[:, :, :, 3:6])
+            outputs = tensorflow.concat(outputs_1,outputs_2,axis=4)
 
+        outputs = self.convolution_op(outputs, self.kernel)
 
         if self.use_bias:
             output_rank = outputs.shape.rank
