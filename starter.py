@@ -10,10 +10,11 @@ if gpus:
         gpus[0],[tf.config.experimental.VirtualDeviceConfiguration(memory_limit=5120)])
   except RuntimeError as e:
     print(e)
-dataset_path = "./data_sets/icecube-neutrinos-in-deep-ice/"#'/kaggle/input/icecube-neutrinos-in-deep-ice/'
+dataset_path = "./data_sets/tlvmc-parkinsons-freezing-gait-prediction/train/"
+#dataset_path = "./data_sets/abstraction-and-reasoning-challenge/image_train_small_second/"
 runner(dataset_path, train_name='test_images', restrict=True,
-       size=200000, target_name='letter', no_ids=False,
-       submit_file='test',
+       size=3, target_name='letter', no_ids=False,
+       submit_file='train',#'test',
        train_file='train',
-       utils_name='specific_loaders.icecubeNeutrinos',
-       split=False, THREAD_COUNT=2, dir_tree=False)
+       #utils_name='specific_loaders.icecubeNeutrinos',
+       split=False, THREAD_COUNT=32, dir_tree=True)

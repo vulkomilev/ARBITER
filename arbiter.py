@@ -27,7 +27,7 @@ class Arbiter(object):
         self.init_agents(router_agent)
         self.init_neural_network()
         self.skip_arbiter = skip_arbiter
-
+        self.return_ids = []
         self.arbiter_router = {
             "": []
         }
@@ -102,6 +102,9 @@ class Arbiter(object):
                         input_list.append(1)
                     else:
                         input_list.append(element.shape)
+                else:
+                    if element.name not in self.return_ids:
+                        self.return_ids.append(element.name)
 
 
         for element in self.data_schema_output:
@@ -171,6 +174,9 @@ class Arbiter(object):
                 return_dict_max[element_key.name] = l_max
         elif type(data_schema) is list:
             for i, element_key in enumerate(data_schema):
+                if element_key.is_id:
+                    if element_key.name not in self.return_ids:
+                        self.return_ids.append(element_key.name)
                 local_data = None
                 local_data_path = ''
                 for element_path in path:
@@ -498,6 +504,9 @@ class Arbiter(object):
         writer = csv.writer(f)
         local_arr = []
         local_dict ={}
+        for element in self.return_ids:
+            local_arr.append(element)
+
         if type(self.data_schema_output) is list:
             for element in self.data_schema_output:
                 local_arr.append(element.name)

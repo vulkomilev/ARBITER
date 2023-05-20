@@ -1,25 +1,26 @@
-import random
-import os
-#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import numpy as np
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from utils.Agent import *
-from custom_layers.ConvSymb import ConvSymb
 import matplotlib.pyplot as plt
+
+from custom_layers.ConvSymb import ConvSymb
+from utils.Agent import *
+
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import matplotlib.animation as animation
-from multiprocessing import Process,Pipe
+from multiprocessing import Pipe
 import cv2
-from utils.utils import normalize_list,one_hot,DataUnit
+from utils.utils import DataUnit
 import copy
-import sys
-last_img = np.zeros((100,1))
-#last_img = np.zeros((12,8,3))
+
+last_img = np.zeros((100, 1))
+# last_img = np.zeros((12,8,3))
 tf.compat.v1.enable_eager_execution()
+
+
 def runGraph(pipe):
     global last_img
     # Parameters
-    x_len = 200         # Number of points to display
+    x_len = 200  # Number of points to display
     y_range = [10, 40]  # Range of possible Y values to display
 
     # Create figure for plotting
@@ -31,34 +32,30 @@ def runGraph(pipe):
     # Create a blank line. We will update the line in animate
     line = ax.plot(last_img)
 
-
-
     # This function is called periodically from FuncAnimation
     def animate(i, ys):
 
-
-
         # Update line with new Y values
-        #print("RECV",pipe.recv())
+        # print("RECV",pipe.recv())
         try:
-         last_img.put(0,pipe.recv())
-         #last_img(0)
-        except Exception as  e:
+            last_img.put(0, pipe.recv())
+            # last_img(0)
+        except Exception as e:
             pass
-           # print(e)
+        # print(e)
         return last_img,
-
 
     # Set up plot to call animate() function periodically
 
     ani = animation.FuncAnimation(fig,
-        animate,
-        fargs=(ys,),
-        interval=50,
-        blit=True)
+                                  animate,
+                                  fargs=(ys,),
+                                  interval=50,
+                                  blit=True)
     ani.save('continuousSineWave.mp4',
-              writer='ffmpeg', fps=30)
+             writer='ffmpeg', fps=30)
     plt.show()
+
 
 class CVAE(tf.keras.Model):
     """Convolutional variational autoencoder."""
@@ -92,34 +89,33 @@ class CVAE(tf.keras.Model):
 
 
 class ImageAutoencoderDiscreteFunctions(Agent):
-    def __init__(self,input_list,output_list ):
+    def __init__(self, input_list, output_list):
         self.model = None
         self.func_map = {}
         self.optimizer = tf.keras.optimizers.Adam(1e-4)
         self.reg_input = [
             DataUnit('str', (), None, 'Id', is_id=True),
-            DataUnit('2D_F', (32,32,3), None, 'Image'),
+            DataUnit('2D_F', (32, 32, 3), None, 'Image'),
 
-
-            ]
+        ]
         self.reg_output = [
             DataUnit('str', (), None, 'Id', is_id=True),
-            DataUnit('2D_F', (32, 32,3), None, 'Image')
+            DataUnit('2D_F', (32, 32, 3), None, 'Image')
         ]
         self.local_image_list = []
-        self.is_init=True
-        self.init_neural_network( latent_dim=(2000))  # 8*4*3
+        self.is_init = True
+        self.init_neural_network(latent_dim=(2000))  # 8*4*3
         self.is_init = False
         self.calc_map_plot_counter = 0
         self.confusion_matrix = {}
-        self.func_arr = [[],[]]
+        self.func_arr = [[], []]
         conn1, conn2 = Pipe()
         self.conn_send = conn2
-        #p = Process(target=runGraph, args=(conn1,))
-        #p.start()
+        # p = Process(target=runGraph, args=(conn1,))
+        # p.start()
 
-    def register(self,arbiter):
-        arbiter.register_neural_network(self,self.reg_input,self.reg_output)
+    def register(self, arbiter):
+        arbiter.register_neural_network(self, self.reg_input, self.reg_output)
 
     def init_neural_network(self, latent_dim):
         self.latent_dim = latent_dim
@@ -130,87 +126,50 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         @tf.function()
         def custom_func(inputs):
             tensor = tf.range(10)
-            indices = [[0, 1,1,1]]  # A list of coordinates to update.
+            indices = [[0, 1, 1, 1]]  # A list of coordinates to update.
 
             values = [1.0]  # A list of values corresponding to the respective
             # coordinate in indices.
 
-            shape = [1,32,32,3]  # The shape of the corresponding dense tensor, same as `c`.
-            #print(inputs)
-            #print(len(inputs[0]))
+            shape = [1, 32, 32, 3]  # The shape of the corresponding dense tensor, same as `c`.
+
             i = 0
-            def while_three(n,j,i,inputs):
-                n+=1
-                #print('while_three')
-                #if tf.math.greater_equal(inputs[0][i][j][0] , tf.convert_to_tensor((1),dtype=tf.float32)):
-                    #inputs[i][n] = 1
-                    #print(i,j)
+
+            def while_three(n, j, i, inputs):
+                n += 1
+
                 indices = [[0, i, j, 1]]
                 delta = tf.SparseTensor(indices, values, shape)
-                #print(delta)
+                # print(delta)
                 tf.sparse.to_dense(delta)
                 inputs = inputs + tf.sparse.to_dense(delta)
-                return n,j,i,inputs
-            def while_two(j,i):
-                n=0
-                j+=1
-                #print('while_two',i,j)
-                #if tf.greater_equal(inputs[0][i][j][0], 0.5):
-                tf.while_loop(cond=lambda n,j,i,inputs: tf.less(n, len(inputs[0][0][0])), body =while_three, loop_vars=[n,j,i,inputs])
-                return i,j
+                return n, j, i, inputs
+
+            def while_two(j, i):
+                n = 0
+                j += 1
+
+                tf.while_loop(cond=lambda n, j, i, inputs: tf.less(n, len(inputs[0][0][0])), body=while_three,
+                              loop_vars=[n, j, i, inputs])
+                return i, j
+
             def while_one(i):
-                #print('while_one')
-                i+=1
+                i += 1
                 j = 0
                 if tf.greater_equal(inputs[0][i][0][0], 0.5):
-                 tf.while_loop(lambda j,i: tf.less(j, len(inputs[0][0])-1), while_two, [j,i])
+                    tf.while_loop(lambda j, i: tf.less(j, len(inputs[0][0]) - 1), while_two, [j, i])
                 return [i]
-            tf.while_loop(lambda i: tf.less(i, len(inputs[0])-1),while_one,[i])
-            '''
-            for i in range(len(inputs[0])):
-                for j in range(len(inputs[0][0])):
-                    #tf.print(inputs, [inputs])
-                    #tf.print(inputs[0][i][j], output_stream=sys.stderr)
 
-                    if inputs[0][i][j][0] >= 0.5:
-                        for n in range(j, len(inputs[0])):
+            tf.while_loop(lambda i: tf.less(i, len(inputs[0]) - 1), while_one, [i])
 
-                                #if tf.math.greater(inputs[0][i][j], [0, 0.5, 0]):
-                                #if inputs[0][i][j][0] >= 1:
-                                #inputs[i][n] = 1
-                                #    break
-                                #inputs[i][n] = 1
-
-                                pass
-                                #indices = [[0, i, 1, j]]
-                                #delta = tf.SparseTensor(indices, values, shape)
-                                #inputs = inputs + tf.sparse.to_dense(delta)
-
-                        #break
-            '''
-            #for j in range(0,2):
-            #    for i in range(0, len(inputs[0])-5):
-            #        if random.randint(0, 14) % 2 == 0:
-            #            indices = [[0, i,1,j]]
-            #            delta = tf.SparseTensor(indices, values, shape)
-            #            #print(inputs.shape)
-            #            #print(tf.sparse.to_dense(delta).shape)
-            #            inputs = inputs + tf.sparse.to_dense(delta)
-
-            #print(indices)
-            #delta = tf.SparseTensor(indices, values, shape)
-            #print(inputs.shape)
-            #print(tf.sparse.to_dense(delta).shape)
-            #inputs = inputs + tf.sparse.to_dense(delta)
             return inputs
-
 
         self.encoder = tf.keras.Sequential([
             tf.keras.layers.InputLayer(input_shape=(width_img, height_img, depth_img)),
             ConvSymb(kernel_size=1,
-                filters=3,rank=2, custom_function=custom_func, strides=(1, 1), activation='relu'),
+                     filters=3, rank=2, custom_function=custom_func, strides=(1, 1), activation='relu'),
             ConvSymb(kernel_size=1,
-                filters=6, rank=2,custom_function=custom_func, strides=(1, 1), activation='relu'),
+                     filters=6, rank=2, custom_function=custom_func, strides=(1, 1), activation='relu'),
             tf.keras.layers.Flatten(),
             tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu'),
             tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu'),
@@ -231,7 +190,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
                     filters=3, kernel_size=2, strides=2, padding='same',
                     activation='relu'),
                 # No activation
-                tf.keras.layers.Reshape(target_shape=( 32, 32,3))
+                tf.keras.layers.Reshape(target_shape=(32, 32, 3))
             ]
         )
 
@@ -244,7 +203,6 @@ class ImageAutoencoderDiscreteFunctions(Agent):
 
         contur_img = np.stack((contur_img,) * 3, axis=-1)
         return contur_img
-
 
     def prepare_data(self, images, in_train=False):
         local_x_train_arr = []
@@ -271,24 +229,21 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             local_image_output = images_collection[local_key]['output']
             if type(local_image_output) == type(None) or type(local_image_input) == type(None):
                 continue
-            #plt.imshow(local_image_output[2])
-            #plt.show()
-            local_image = copy.deepcopy(local_image_input)   # np.concatenate((local_image_input, local_image_output), axis=0)
+            # plt.imshow(local_image_output[2])
+            # plt.show()
+            local_image = copy.deepcopy(
+                local_image_input)  # np.concatenate((local_image_input, local_image_output), axis=0)
 
             local_x_train_arr.append(
-         np.array(np.resize(np.float32(local_image),(1,32,32,3))))  # self.contur_image(local_image)
+                np.array(np.resize(np.float32(local_image), (1, 32, 32, 3))))  # self.contur_image(local_image)
 
-            local_y_train_arr.append( np.array(np.resize(np.float32(local_image_output), (1, 32, 32, 3))))
+            local_y_train_arr.append(np.array(np.resize(np.float32(local_image_output), (1, 32, 32, 3))))
 
         return np.array(local_x_train_arr), np.array(local_y_train_arr), np.array(local_target_train_arr)
 
-
-
     def log_normal_pdf(self, sample, mean, logvar, raxis=1):
         log2pi = tf.math.log(2. * np.pi)
-        return tf.reduce_sum(     -.005 * ((sample - mean ) ** 2. * tf.exp(-logvar) + logvar + log2pi),  axis=raxis)
-
-    #tf.reduce_sum(     -.005 * ((sample - mean ) ** 2. * tf.exp(-logvar) + logvar + log2pi),  axis=raxis)
+        return tf.reduce_sum(-.005 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi), axis=raxis)
 
     def sample(self, eps=None):
         if eps is None:
@@ -314,77 +269,64 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             return probs
         return logits
 
-    def custom_function_1(self,mean):
+    def custom_function_1(self, mean):
         local_np = mean.numpy()
         new_np = [[]]
 
         for element in local_np[0]:
-           if element >= 0.0:
-            new_np[0].append(1.0)
-           elif element < 0.0:
-            new_np[0].append(-1.0)
-        #print(mean.shape)
-        #print(np.array(new_np).shape)
+            if element >= 0.0:
+                new_np[0].append(1.0)
+            elif element < 0.0:
+                new_np[0].append(-1.0)
         return tf.convert_to_tensor(new_np)
 
-    def compute_loss(self,model, x,y,is_plot=False):
+    def compute_loss(self, model, x, y, is_plot=False):
         mean, logvar = self.encode(x)
         mean = self.custom_function_1(mean)
         z = self.reparameterize(mean, logvar)
         x_logit = self.decode(z)
-        self.calc_map_plot_counter+=1
+        self.calc_map_plot_counter += 1
         if self.calc_map_plot_counter % 100 == 0:
-         plt.imshow(x_logit[0])
-         plt.show()
+            plt.imshow(x_logit[0])
+            plt.show()
         cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=y)
         logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
         logpz = self.log_normal_pdf(z, 0., 0.)
-        logqz_x =  self.log_normal_pdf(z, mean, logvar)
+        logqz_x = self.log_normal_pdf(z, mean, logvar)
         return -tf.reduce_mean(logpx_z + logpz - logqz_x)
 
-    def train(self, images, force_train=False,only_fill=True):
-        global  last_img
+    def train(self, images, force_train=False, only_fill=True):
+        global last_img
         if images != None:
-         self.local_image_list.append(images)
+            self.local_image_list.append(images)
 
         if only_fill:
             return
         x_train, y_train, func_name = self.prepare_data(self.local_image_list, in_train=True)
-        #print('prepare_data',np.array(x_train).shape)
 
         for x, y in zip(x_train, y_train):
             with tf.GradientTape(persistent=True) as tape:
-                #plt.imshow(x[0])
-                #plt.show()
+
                 loss = self.compute_loss(self.model, x, y, is_plot=False)
                 try:
-                 self.conn_send.send(loss)
+                    self.conn_send.send(loss)
                 except BrokenPipeError as e:
 
                     pass
-                print('local_loss',loss)
-                #loss_enc = self.compute_loss_encoder_ordinary_dense(self.model, x, y, target_type, is_plot=False)
-            # if tf.math.is_nan(loss):
-            #     loss = tf.zeros(1)
+                print('local_loss', loss)
+
             self.gradients = tape.gradient(loss, self.encoder.trainable_variables + self.decoder.trainable_variables)
-           #gradients_encoder = tape.gradient(loss_enc, self.encoder.trainable_variables)
-        #loss_arr.append(loss.numpys().item())
+
         if 'gradients' not in dir(self):
             return
         self.optimizer.apply_gradients(
-                    zip(self.gradients, self.encoder.trainable_variables + self.decoder.trainable_variables))
-           # loss_enc_arr.append(loss_enc.numpy().item())
-            #if None not in gradients_encoder:
-            #    self.optimizer.apply_gradients(
-            #        zip(gradients, self.encoder.trainable_variables + self.decoder.trainable_variables))
-                #self.optimizer.apply_gradients(zip(gradients_encoder, self.encoder.trainable_variables))
+            zip(self.gradients, self.encoder.trainable_variables + self.decoder.trainable_variables))
+
         print('gradients applied')
         mean, logvar = self.encode(x_train[0])
         z = self.reparameterize(mean, logvar)
         x_logit = self.decode(z)
-        # return [x_logit]
-        #image_1 = image_1.astype('float64')
-        #image_1 *= 255.0 / image_1.max()
+
         image = x_logit.numpy()[0]
         image *= 255.0 / image.max()
 
@@ -393,28 +335,18 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         if re_result:
             ckpt_name = re_result.group(1)
 
-        self.encoder.save('./checkpoints/' + ckpt_name+'_encoder')
-        self.decoder.save('./checkpoints/' + ckpt_name+'_decoder')
-        last_img =z
-        #plt.imshow(x_train[0][0])
-        #plt.show()
-        #if self.calc_map_plot_counter %1 == 0 :
-        #plt.imshow(y_train[0][0])
-        #plt.show()
-            #pyplot.imshow(image_1)
-            #pyplot.show()
-            #pyplot.imshow(x_train[0][0])
-            #pyplot.show()
+        self.encoder.save('./checkpoints/' + ckpt_name + '_encoder')
+        self.decoder.save('./checkpoints/' + ckpt_name + '_decoder')
+        last_img = z
+
     def save(self):
         pass
+
     def predict(self, image):
 
         x_train, y_train, func_name = self.prepare_data([image], in_train=False)
-        #self.compute_loss_encoder_ordinary_dense(self.model, x_train[0], y_train[0], func_name[0], is_plot=True,
-        #                                         is_plot_now=False)
-        #x_train = x_train[0]
-        #y_image = y_train[0]
-        for x_element ,y_element in zip(x_train,y_train):
+
+        for x_element, y_element in zip(x_train, y_train):
             if x_train.shape[0] == 0:
                 return None
             image_1 = x_element
@@ -425,20 +357,15 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             image_1 = image_1.astype('int')
             y_image = y_element.astype('int')
 
-            #print('image_1.max()', image_1.max())
             image = x_logit.numpy()[0]
-            image = image*(255.0 / image.max())
-            image_1 = image_1*(1.0 / image_1.max())
-            y_image = y_image*(1.0 / y_image.max())
-            #print('z',image.shape)
-            #print('z', image_1.shape)
-            #print('z', y_image.shape)
+            image = image * (255.0 / image.max())
+            image_1 = image_1 * (1.0 / image_1.max())
+            y_image = y_image * (1.0 / y_image.max())
             plt.imshow(image)
             plt.show()
             plt.imshow(x_element)
             plt.show()
             plt.imshow(y_element)
             plt.show()
-
 
         return None

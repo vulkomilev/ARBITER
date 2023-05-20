@@ -258,7 +258,6 @@ class ConvSymb(Layer):
         if self._is_causal:  # Apply causal padding to inputs for Conv1D.
             inputs = tf.pad(inputs, self._compute_causal_padding(inputs))
         if inputs.shape[3]:
-            #print(inputs[:,:,:,:3])#tf.math.greater(inputs[:,:,:,:3], [0, 0.5, 0]))
             outputs = self.custom_function(inputs[:,:,:,:3])
 
         else:
