@@ -503,6 +503,8 @@ class Arbiter(object):
             for element in data.data_collection:
                 if element.is_id:
                     if id_dict[element.name] == None:
+                          if type(element.data) == type(np.zeros((1,2))):
+                              element.data = element.data.tolist()
                           id_dict[element.name]  = element.data
     def denormalize(self, data):
         if type(data) is not type([]):
@@ -516,16 +518,20 @@ class Arbiter(object):
         local_arr = []
         local_dict ={}
         output_id_dict = {}
-        for element in self.return_ids:
-            local_arr.append(element)
+        local_arr.append('Id')
+        #for element in self.return_ids:
+        #    local_arr.append(element)
 
         if type(self.data_schema_output) is list:
             for element in self.data_schema_output:
                 if element.is_id:
                     output_id_dict[element.name] = None
-                local_arr.append(element.name)
+                else:
+                  local_arr.append(element.name)
+
         else:
             local_arr = self.get_schema_names(self.data_schema_output)
+
         for element in self.get_schema_names(self.data_schema_output):
             local_dict[element] = []
         writer.writerow(local_arr)
@@ -536,12 +542,15 @@ class Arbiter(object):
             results = np.squeeze(results)
             results = self.denormalize(results)
             local_arr = []
+            final_ids = []
             try:
                 local_id_dict = copy.deepcopy(output_id_dict)
                 self.get_data_ids(self.bundle_bucket[key].source,local_id_dict)
                 for element in self.data_schema_output:
                     if element.is_id:
-                        local_arr.append(local_id_dict[element.name])
+                        final_ids.append(str(local_id_dict[element.name]))
+                print(final_ids)
+                local_arr.append('_'.join(final_ids).replace('.csv',''))
             except Exception as e:
                 print(e)
                 exit(0)

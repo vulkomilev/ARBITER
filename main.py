@@ -496,8 +496,9 @@ target_type = CATEGORY
 
 data_schema_input =     {
         'defog':[
+
+            DataUnit('str', (), None, 'filename', is_id=True),
             DataUnit('int', (), None, 'Time',is_id=True),
-            DataUnit('str', (), None, 'filename',is_id=True),
             DataUnit('float', (), None, 'AccV'),
             DataUnit('float', (), None, 'AccML'),
             DataUnit('float', (), None, 'AccAP'),
@@ -507,8 +508,9 @@ data_schema_input =     {
             DataUnit('bool', (), None, 'Valid'),
             DataUnit('bool', (), None, 'Task')],
         'notype': [
-            DataUnit('int', (), None, 'Time',is_id=True),
+
             DataUnit('str', (), None, 'filename', is_id=True),
+            DataUnit('int', (), None, 'Time',is_id=True),
             DataUnit('float', (), None, 'AccV'),
             DataUnit('float', (), None, 'AccML'),
             DataUnit('float', (), None, 'AccAP'),
@@ -516,8 +518,9 @@ data_schema_input =     {
             DataUnit('bool', (), None, 'Valid'),
             DataUnit('bool', (), None, 'Task')],
         'tdcsfog': [
-            DataUnit('int', (), None, 'Time',is_id=True),
+
             DataUnit('str', (), None, 'filename', is_id=True),
+            DataUnit('int', (), None, 'Time',is_id=True),
             DataUnit('float', (), None, 'AccV'),
             DataUnit('float', (), None, 'AccML'),
             DataUnit('float', (), None, 'AccAP'),
@@ -528,8 +531,8 @@ data_schema_input =     {
     }
 
 data_schema_output = [
-    DataUnit('int', (), None, 'Time', is_id=True),
     DataUnit('str', (), None, 'filename', is_id=True),
+    DataUnit('int', (), None, 'Time', is_id=True),
     DataUnit('float', (), None, 'StartHesitation'),
     DataUnit('float', (), None, 'Turn'),]
 
