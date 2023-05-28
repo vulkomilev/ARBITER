@@ -217,10 +217,21 @@ class ImageAutoencoderDiscreteFunctions(Agent):
 
             if local_id[:8] not in images_collection.keys():
                 images_collection[local_id[:8]] = {'input': None, 'output': None}
-            if 'input' in local_id:
-                images_collection[local_id[:8]]['input'] = local_image
-            elif 'output' in local_id:
-                images_collection[local_id[:8]]['output'] = local_image
+            print('local_id',local_id)
+            print(np.array(local_image).shape)
+            plt.imshow(local_image[0])
+            plt.show()
+            plt.imshow(local_image[1])
+            plt.show()
+            plt.imshow(local_image[2])
+            plt.show()
+            exit(0)
+            images_collection[local_id[:8]]['input'] = local_image[1]
+            images_collection[local_id[:8]]['output'] = local_image[0]
+            #if 'input' in local_id:
+            #    images_collection[local_id[:8]]['input'] = local_image[1]
+            #elif 'output' in local_id:
+            #    images_collection[local_id[:8]]['output'] = local_image[0]
         for local_key in images_collection.keys():
             local_image_input = images_collection[local_key]['input']
             if images_collection[local_key]['output'] is None or images_collection[local_key]['input'] is None:
@@ -233,7 +244,10 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             # plt.show()
             local_image = copy.deepcopy(
                 local_image_input)  # np.concatenate((local_image_input, local_image_output), axis=0)
-
+            #plt.imshow(local_image_input)
+            #plt.show()
+            #plt.imshow(local_image_output)
+            #plt.show()
             local_x_train_arr.append(
                 np.array(np.resize(np.float32(local_image), (1, 32, 32, 3))))  # self.contur_image(local_image)
 
@@ -287,6 +301,10 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         x_logit = self.decode(z)
         self.calc_map_plot_counter += 1
         if self.calc_map_plot_counter % 100 == 0:
+            plt.imshow(x[0])
+            plt.show()
+            plt.imshow(y[0])
+            plt.show()
             plt.imshow(x_logit[0])
             plt.show()
         cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=y)
@@ -305,6 +323,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         x_train, y_train, func_name = self.prepare_data(self.local_image_list, in_train=True)
 
         for x, y in zip(x_train, y_train):
+
             with tf.GradientTape(persistent=True) as tape:
 
                 loss = self.compute_loss(self.model, x, y, is_plot=False)

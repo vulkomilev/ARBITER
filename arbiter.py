@@ -1,3 +1,4 @@
+import copy
 import csv
 import datetime
 import numpy as np
@@ -102,9 +103,6 @@ class Arbiter(object):
                         input_list.append(1)
                     else:
                         input_list.append(element.shape)
-                else:
-                    if element.name not in self.return_ids:
-                        self.return_ids.append(element.name)
 
 
         for element in self.data_schema_output:
@@ -185,6 +183,10 @@ class Arbiter(object):
                 local_data = []
                 for element in data:
                     local_data.append(element.get_by_name(element_key.name))
+                if None in local_data:
+                  for i in range(len(local_data)):
+                    if local_data[i] == None:
+                        local_data[i] = 0
                 if type(local_data) == list or type(local_data) == type(np.ndarray(shape=0)):
                     if element_key.type == 'int' and element_key.is_id == False:
 
@@ -252,8 +254,8 @@ class Arbiter(object):
                     local_norm_arr.append(get_data_by_list(self.bundle_bucket[key].source,element))
 
                 norm_data = self.normalize_data_bundle(local_norm_arr)
-                for key in local_key_list:
-                     set_data_by_list(self.bundle_bucket[key].source,element,norm_data)
+                for i,key in enumerate(local_key_list):
+                     set_data_by_list(self.bundle_bucket[key].source,element,norm_data,i)
 
 
     def normalize_data_bundle_dict(self,input_bucket,is_submit,keys,fill_dict):
@@ -492,7 +494,16 @@ class Arbiter(object):
             for element in schema:
                 return_list.append(element.name)
         return return_list
-
+    def get_data_ids(self, data,id_dict):
+        if type(data) is dict:
+            for element_key in data.keys():
+                local_element = data[element_key]
+                self.get_data_ids(local_element,id_dict)
+        else:
+            for element in data.data_collection:
+                if element.is_id:
+                    if id_dict[element.name] == None:
+                          id_dict[element.name]  = element.data
     def denormalize(self, data):
         if type(data) is not type([]):
             data = list(self.target_min.values())[0] + data * (
@@ -504,11 +515,14 @@ class Arbiter(object):
         writer = csv.writer(f)
         local_arr = []
         local_dict ={}
+        output_id_dict = {}
         for element in self.return_ids:
             local_arr.append(element)
 
         if type(self.data_schema_output) is list:
             for element in self.data_schema_output:
+                if element.is_id:
+                    output_id_dict[element.name] = None
                 local_arr.append(element.name)
         else:
             local_arr = self.get_schema_names(self.data_schema_output)
@@ -523,8 +537,11 @@ class Arbiter(object):
             results = self.denormalize(results)
             local_arr = []
             try:
-
-                local_arr.append(key)
+                local_id_dict = copy.deepcopy(output_id_dict)
+                self.get_data_ids(self.bundle_bucket[key].source,local_id_dict)
+                for element in self.data_schema_output:
+                    if element.is_id:
+                        local_arr.append(local_id_dict[element.name])
             except Exception as e:
                 print(e)
                 exit(0)
@@ -535,7 +552,6 @@ class Arbiter(object):
                     arr_element = int(arr_element)
 
                 local_dict[element].append(arr_element)
-            print('local_arr',local_arr)
             writer.writerow(local_arr)
 
 

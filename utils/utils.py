@@ -70,9 +70,12 @@ class DataCollection(object):
                 self.data_collection[i].data = copy.deepcopy(val)
                 return
 
-    def set_by_dict(self, input_dict):
+    def set_by_dict(self, input_dict,index=-1):
         for i, element in enumerate(self.data_collection):
             if element.name in list(input_dict.keys()):
+               if index != -1:
+                   self.data_collection[i].data = copy.deepcopy(input_dict[element.name][index])
+               else:
                 self.data_collection[i].data = copy.deepcopy(input_dict[element.name])
 
     def get_dict(self, include_only_id=False):
@@ -149,8 +152,9 @@ class ModelIOReg(object):
 
 class DataUnit(object):
 
-    def __init__(self, type_val, shape, data, name='', is_id=False, break_seq=False, break_size=100):
+    def __init__(self, type_val, shape, data, name='', is_id=False, break_seq=False, break_size=100,is_file_name=False):
         self.is_id = is_id
+        self.is_file_name = is_file_name
         if type_val not in DATA_FORMATS:
             raise RuntimeError('Data type in data provided is not supported')
         if data is not None:
@@ -571,24 +575,30 @@ def data_bundle_and_path(input_dict):
     return return_template, return_path_list
 
 
-def set_data_by_list(input_dict, key_list, data):
+def set_data_by_list(input_dict, key_list, data,index=-1):
     if len(key_list) > 1:
         get_data_by_list(input_dict[key_list[0]], key_list[1:])
     else:
         if len(key_list) == 0:
-            input_dict.set_by_dict(data)
+            input_dict.set_by_dict(data,index)
         else:
-            input_dict[key_list[0]].set_by_dict(data)
+            input_dict[key_list[0]].set_by_dict(data,index)
 
 
-def add_dict_path_recs(target_dict, target_list, data):
+def add_dict_path_recs(target_dict, target_list, data,file_name):
+
     if len(target_list) > 1:
-        add_dict_path_recs(target_dict[target_list[0]], target_list[1:], data)
+        add_dict_path_recs(target_dict[target_list[0]], target_list[1:], data,file_name)
         return
     if type(target_dict[target_list[0]]) == type({}):
         target_dict[target_list[0]] = []
 
-    target_dict[target_list[0]] += data
+    if target_list[0] == 'filename':
+        target_dict[target_list[0]] += [file_name]*add_dict_path_recs.local_data_len
+    else:
+        target_dict[target_list[0]] += data
+        add_dict_path_recs.local_data_len = len(data)
+
 
 
 def create_dict_path_recs(target_dict, target_list):
@@ -626,12 +636,20 @@ def worker_load_image_data_from_dir_tree_csv(args):
         if os.path.exists(dir_path + element):
             df = pd.read_csv(dir_path + element)
             local_dict = df.to_dict()
-            for element in list(local_dict.keys()):
+            local_keys =['filename']+list(local_dict.keys())
+            for element in local_keys:
                 create_dict_path_recs(GLOBAL_DATA, element_tree[:1] + [element])
-            for element in list(local_dict.keys()):
+            for element in local_keys:
                 try:
-                    add_dict_path_recs(GLOBAL_DATA, element_tree[:1] + [element], list(local_dict[element].values()))
+
+                    if element not in list(local_dict.keys()):
+                        local_data_arr = []
+                    else:
+                        local_data_arr = list(local_dict[element].values())
+                    add_dict_path_recs.local_data_len = len(local_dict[list(local_dict.keys())[0]])
+                    add_dict_path_recs(GLOBAL_DATA, element_tree[:1] + [element], local_data_arr,element_tree[-1])
                 except Exception as e:
+                    print('!!!!!!!!')
                     print(e)
                     exit(0)
     return
@@ -687,8 +705,9 @@ def worker_load_image_data_from_csv(args):
         for element in data_schema_input:
             if element.name in list(local_dict.keys()):
                 local_row.append(local_dict[element.name][i])
+
             elif element.type in DATA_FORMATS_SPECIAL:
-                local_row.append(find_image_by_name(local_dict[list(local_dict.keys())[local_id_poss[0] - 1]][i],
+                local_row.append(find_image_by_name (local_dict[list(local_dict.keys())[local_id_poss[0] - 1]][i],
                                                     path))
 
 
@@ -757,6 +776,7 @@ def list_files(startpath, dir_path):
 
 
 def add_recursive(data, path, dict_add):
+
     if path[0] not in list(dict_add.keys()):
 
         if len(path) > 1:
@@ -767,45 +787,52 @@ def add_recursive(data, path, dict_add):
     if len(path) > 1:
         add_recursive(data, path[1:], dict_add[path[0]])
     else:
-
         dict_add[path[0]] = data
 
 
 def fill_global_id_data(args):
     local_ids, local_data, array_ids, average_len, j, back_keys = args
+
     for i in range(len(array_ids[j * average_len:j * average_len + average_len])):
 
         print(i, '/', len(array_ids))
         for local_key in list(local_data.keys()):
-            add_recursive(local_data[local_key][i], [array_ids[average_len * j + i]] + back_keys + [local_key],
-                          GLOBAL_ID_DATA)
 
+            for element in back_keys:
+               add_recursive(local_data[local_key][i], [array_ids[average_len * j + i]] + [element] + [local_key],
+                          GLOBAL_ID_DATA)
+    pass
 
 def recursiv_match(input_dict, data_schema, key=''):
     global GLOBAL_ID_DATA
+
     if type(data_schema) == type({}):
         for second_key in list(data_schema.keys()):
             if second_key in list(input_dict.keys()):
                 recursiv_match(input_dict[second_key], data_schema[second_key], key=key + [second_key])
 
     if type(data_schema) == type([]):
-        array_id = None
+        array_id = []
         local_dict = {}
         for local_key in list(data_schema):
             if local_key.is_id:
-                array_id = input_dict[local_key.name]
+                if len(array_id) == 0:
+                   array_id = copy.deepcopy(input_dict[local_key.name])
+                else:
+                    for i in range(len(input_dict[local_key.name])):
+                        array_id[i] = str(array_id[i])+'-'+str(input_dict[local_key.name][i])
 
         id_list_ordered = split_list(target_list=array_id, count=THREAD_COUNT, restrict=False, size=100)
         input_dict_splited = [input_dict] * THREAD_COUNT
         array_id_splited = [array_id] * THREAD_COUNT
         average_len = [len(id_list_ordered)] * THREAD_COUNT
-        back_keys = [key] * THREAD_COUNT
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
+        back_keys = [['defog', 'notype', 'tdcsfog']] * THREAD_COUNT
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = [executor.submit(fill_global_id_data, args) for args in
                        zip(id_list_ordered, input_dict_splited, array_id_splited, average_len,
                            range(len(id_list_ordered)), back_keys)]
             results = [f.result() for f in futures]
+        #exit(0)
 
 
 def load_id_from_dir_tree_csv(dir_path, data_schema_input, data_schema_output, restrict=False, size=100):

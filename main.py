@@ -1,7 +1,8 @@
-from arbiter import Arbiter
-from utils.utils import DataUnit
-from utils.utils import REGRESSION, CATEGORY, IMAGE, STRING
 import importlib
+
+from arbiter import Arbiter
+from utils.utils import CATEGORY
+from utils.utils import DataUnit
 
 print('Loading images ...')
 
@@ -492,19 +493,22 @@ agent_router = [{'DenseScrable': ''}]
                                                 """
 
 target_type = CATEGORY
+
 data_schema_input =     {
         'defog':[
-        DataUnit('float', (), None, 'Time',is_id=True),
-        DataUnit('float', (), None, 'AccV'),
-        DataUnit('float', (), None, 'AccML'),
-        DataUnit('float', (), None, 'AccAP'),
-        DataUnit('float', (), None, 'StartHesitation'),
-        DataUnit('float', (), None, 'Turn'),
-        DataUnit('float', (), None, 'Walking'),
-        DataUnit('bool', (), None, 'Valid'),
-        DataUnit('bool', (), None, 'Task')],
+            DataUnit('int', (), None, 'Time',is_id=True),
+            DataUnit('str', (), None, 'filename',is_id=True),
+            DataUnit('float', (), None, 'AccV'),
+            DataUnit('float', (), None, 'AccML'),
+            DataUnit('float', (), None, 'AccAP'),
+            DataUnit('float', (), None, 'StartHesitation'),
+            DataUnit('float', (), None, 'Turn'),
+            DataUnit('float', (), None, 'Walking'),
+            DataUnit('bool', (), None, 'Valid'),
+            DataUnit('bool', (), None, 'Task')],
         'notype': [
-            DataUnit('float', (), None, 'Time',is_id=True),
+            DataUnit('int', (), None, 'Time',is_id=True),
+            DataUnit('str', (), None, 'filename', is_id=True),
             DataUnit('float', (), None, 'AccV'),
             DataUnit('float', (), None, 'AccML'),
             DataUnit('float', (), None, 'AccAP'),
@@ -512,20 +516,25 @@ data_schema_input =     {
             DataUnit('bool', (), None, 'Valid'),
             DataUnit('bool', (), None, 'Task')],
         'tdcsfog': [
-            DataUnit('float', (), None, 'Time',is_id=True),
+            DataUnit('int', (), None, 'Time',is_id=True),
+            DataUnit('str', (), None, 'filename', is_id=True),
             DataUnit('float', (), None, 'AccV'),
             DataUnit('float', (), None, 'AccML'),
             DataUnit('float', (), None, 'AccAP'),
             DataUnit('float', (), None, 'StartHesitation'),
             DataUnit('float', (), None, 'Turn'),
             DataUnit('float', (), None, 'Walking')]
+
     }
 
 data_schema_output = [
+    DataUnit('int', (), None, 'Time', is_id=True),
+    DataUnit('str', (), None, 'filename', is_id=True),
     DataUnit('float', (), None, 'StartHesitation'),
     DataUnit('float', (), None, 'Turn'),]
 
 agent_router = [{'DenseScrable': ''}]
+
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
 def runner(dataset_path, train_name='train', restrict=True, \
            size=10, target_name='letter', no_ids=False,
@@ -536,6 +545,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
            split=True, THREAD_COUNT=32, dir_tree=True,
            utils_name='utils'):
     exec('from utils.' + utils_name + ' import image_loader')
+    print('data_schema_input 1',data_schema_input)
     image_loader = importlib.import_module('utils.' + utils_name, package='.').image_loader
 
     image_collection_train, image_collection_test = image_loader(dataset_path
@@ -550,14 +560,14 @@ def runner(dataset_path, train_name='train', restrict=True, \
                       data_schema_output=data_schema_output, target_type=target_type,
                       class_num=image_collection_train['num_classes'],
                       router_agent=agent_router, skip_arbiter=False)
-    #print(type(image_collection_train['image_arr']))
-    #print(image_collection_train['image_arr'][0])
-    #exit(0)
+    # print(type(image_collection_train['image_arr']))
+    # print(image_collection_train['image_arr'][0])
+    # exit(0)
     for key in list(image_collection_train['image_arr'].keys()):
-        arbiter.add_bundle_bucket(key,image_collection_train['image_arr'][key])
-    #print(image_collection_train)
+        arbiter.add_bundle_bucket(key, image_collection_train['image_arr'][key])
+    # print(image_collection_train)
     arbiter.normalize_bundle_bucket()
-    for i in range(10):
+    for i in range(1):
         arbiter.train(force_train=True, train_arbiter=False)
     arbiter.save()
     arbiter.empty_bucket()
@@ -570,6 +580,6 @@ def runner(dataset_path, train_name='train', restrict=True, \
                                                                  split=split, THREAD_COUNT_V=THREAD_COUNT,
                                                                  dir_tree=dir_tree)
     for key in list(image_collection_train['image_arr'].keys())[:100]:
-        arbiter.add_bundle_bucket(key,image_collection_train['image_arr'][key])
-    arbiter.normalize_bundle_bucket(is_submit=True)
+        arbiter.add_bundle_bucket(key, image_collection_train['image_arr'][key])
+    #arbiter.normalize_bundle_bucket(is_submit=True)
     arbiter.submit('/kaggle/working/')
