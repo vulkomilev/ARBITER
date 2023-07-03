@@ -636,7 +636,7 @@ def worker_load_image_data_from_dir_tree_csv(args):
         print('==============')
         create_dict_path_recs(GLOBAL_DATA, element_tree[:1])
         if os.path.exists(dir_path + element):
-            df = pd.read_csv(dir_path + element)
+            df = pd.read_csv(dir_path + element,low_memory=False)
             local_dict = df.to_dict()
             local_keys =['filename']+list(local_dict.keys())
             for element in local_keys:
