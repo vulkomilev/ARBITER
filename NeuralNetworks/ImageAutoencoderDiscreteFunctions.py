@@ -1,6 +1,7 @@
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from custom_layers.ConvSymb import ConvSymb
 from utils.Agent import *
@@ -12,11 +13,23 @@ import cv2
 from utils.utils import DataUnit
 import copy
 
+import traceback
 last_img = np.zeros((100, 1))
 # last_img = np.zeros((12,8,3))
-tf.compat.v1.enable_eager_execution()
+#tf.compat.v1.enable_eager_execution()
 
-
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+  # Restrict TensorFlow to only use the first GPU
+  try:
+    tf.config.set_visible_devices(gpus[0], 'GPU')
+    logical_gpus = tf.config.list_logical_devices('GPU')
+    print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPU")
+  except RuntimeError as e:
+    # Visible devices must be set before GPUs have been initialized
+    print(e)
+print('gpus',gpus)
+#exit(0)
 def runGraph(pipe):
     global last_img
     # Parameters
@@ -125,8 +138,6 @@ class ImageAutoencoderDiscreteFunctions(Agent):
 
         @tf.function()
         def custom_func(inputs):
-            tensor = tf.range(10)
-            indices = [[0, 1, 1, 1]]  # A list of coordinates to update.
 
             values = [1.0]  # A list of values corresponding to the respective
             # coordinate in indices.
@@ -149,23 +160,85 @@ class ImageAutoencoderDiscreteFunctions(Agent):
                 n = 0
                 j += 1
 
-                tf.while_loop(cond=lambda n, j, i, inputs: tf.less(n, len(inputs[0][0][0])), body=while_three,
+                tf.while_loop(cond=lambda n, j, i, inputs: tf.less(n, inputs.shape.as_list()[3]), body=while_three,
                               loop_vars=[n, j, i, inputs])
                 return i, j
 
+            @tf.function()
             def while_one(i):
                 i += 1
                 j = 0
-                if tf.greater_equal(inputs[0][i][0][0], 0.5):
-                    tf.while_loop(lambda j, i: tf.less(j, len(inputs[0][0]) - 1), while_two, [j, i])
+                tf.while_loop(lambda j, i: tf.less(j, inputs.shape.as_list()[2] - 1), while_two, [j, i])
+                tf.greater_equal(inputs[0][i][0][0], 0.5)
+                tf.cond(tf.greater_equal(inputs[0][i][0][0], 0.5),lambda i=i ,j=j : tf.while_loop(lambda j, i: tf.less(j, inputs.shape.as_list()[2] - 1), while_two, [j, i]),lambda i=i  :[0,0])
                 return [i]
-
-            tf.while_loop(lambda i: tf.less(i, len(inputs[0]) - 1), while_one, [i])
+            tf.while_loop(lambda i: tf.less(i, inputs.shape.as_list()[1] - 1), while_one, [i])
 
             return inputs
 
+        @tf.function()
+        def custom_func_compare_v1(inputs):
+
+            values = [1.0]  # A list of values corresponding to the respective
+            # coordinate in indices.
+
+            shape = [1, 32, 32, 3]  # The shape of the corresponding dense tensor, same as `c`.
+
+            i = 0
+
+
+            result  =  tf.SparseTensor([[0, 0, 0, 1]], values, shape)
+            result = tf.sparse.to_dense(result)
+            result  = tf.cast(result,dtype=tf.float32)
+            def while_three(n, j, i, inputs):
+                n += 1
+
+                indices = [[0, i, j, 1]]
+                delta = tf.SparseTensor(indices, values, shape)
+                # print(delta)
+                tf.sparse.to_dense(delta)
+                result =  tf.sparse.to_dense(delta)
+                return n, j, i, inputs
+
+            def while_two(j, i):
+                n = 0
+                j += 1
+
+                tf.while_loop(cond=lambda n, j, i, inputs: tf.less(n, inputs.shape.as_list()[3]), body=while_three,
+                              loop_vars=[n, j, i, inputs])
+                return i, j
+
+            @tf.function()
+            def while_one(i):
+                i += 1
+                j = 0
+                tf.while_loop(lambda j, i: tf.less(j, inputs.shape.as_list()[2] - 1), while_two, [j, i])
+                tf.greater_equal(inputs[0][i][0][0], 0.5)
+                tf.cond(tf.greater_equal(inputs[0][i][0][0], 0.5),lambda i=i ,j=j : tf.while_loop(lambda j, i: tf.less(j, 32 - 1), while_two, [j, i]),lambda i=i  :[0,0])
+                return [i]
+            tf.while_loop(lambda i: tf.less(i, 32 - 1), while_one, [i])
+
+            return tf.math.squared_difference(result,inputs[:][:32][:][:])
+
+        @tf.function()
+        def custom_func_compare_v2(inputs):
+            values = [1.0]  # A list of values corresponding to the respective
+            # coordinate in indices.
+
+            shape = [1, 32, 32, 3]  # The shape of the corresponding dense tensor, same as `c`.
+
+            result = inputs[:][:32][:][:]
+            result = tf.image.rot90(result)
+
+            return tf.reduce_sum(tf.math.squared_difference(result, inputs[:][32:][:][:]), keepdims=True)
+            #return inputs
+
+        '''
         self.encoder = tf.keras.Sequential([
             tf.keras.layers.InputLayer(input_shape=(width_img, height_img, depth_img)),
+            tf.keras.layers.Dense(3, activation='relu'),
+            tf.keras.layers.Dense(3, activation='relu'),
+            tf.keras.layers.Reshape(target_shape=(32,32,3)),
             ConvSymb(kernel_size=1,
                      filters=3, rank=2, custom_function=custom_func, strides=(1, 1), activation='relu'),
             ConvSymb(kernel_size=1,
@@ -176,6 +249,29 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             tf.keras.layers.Dense(latent_dim + latent_dim, activation='gelu')
         ]
         )
+        '''
+        self.encoder_input_1 = tf.keras.layers.Input(shape=(width_img, height_img, depth_img))
+        self.encoder_1 = tf.keras.layers.Dense(3, activation='relu')(self.encoder_input_1)
+        self.encoder_1 = tf.keras.layers.Dense(3, activation='relu')(self.encoder_1)
+        self.encoder_1 = tf.keras.layers.Reshape(target_shape=(32,32,3))(self.encoder_1)
+        #self.encoder_1 = ConvSymb(kernel_size=1,
+      #              filters=1, rank=2, custom_function=custom_func_compare_v2, strides=(1, 1), activation='relu')(self.encoder_1)
+        #self.encoder_1 = ConvSymb(kernel_size=1,
+        #             filters=1, rank=2, custom_function=custom_func_compare_v2, strides=(1, 1), activation='relu')(self.encoder_1)
+        self.encoder_1 = tf.keras.layers.Flatten()(self.encoder_1)
+
+        self.encoder_input_2 = tf.keras.layers.Input(shape=(width_img, height_img, depth_img))
+        self.encoder_2 = tf.keras.layers.Dense(3, activation='relu')(self.encoder_input_2)
+        self.encoder_2 = tf.keras.layers.Dense(3, activation='relu')(self.encoder_2)
+        self.encoder_2 = tf.keras.layers.Flatten()(self.encoder_2)
+
+       # self.encoder = tf.keras.layers.Concatenate(axis=1)([self.encoder_1, self.encoder_2])
+        self.encoder = tf.keras.layers.Flatten()(self.encoder_2)
+        self.encoder = tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu')(self.encoder)
+        self.encoder = tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu')(self.encoder)
+        self.encoder = tf.keras.layers.Dense(latent_dim + latent_dim, activation='gelu')(self.encoder)
+        self.encoder_model = tf.keras.Model(inputs=[self.encoder_input_2],outputs= self.encoder)#self.encoder_input_1,
+
 
         self.decoder = tf.keras.Sequential(
             [
@@ -217,21 +313,19 @@ class ImageAutoencoderDiscreteFunctions(Agent):
 
             if local_id[:8] not in images_collection.keys():
                 images_collection[local_id[:8]] = {'input': None, 'output': None}
-            print('local_id',local_id)
-            print(np.array(local_image).shape)
-            plt.imshow(local_image[0])
-            plt.show()
-            plt.imshow(local_image[1])
-            plt.show()
-            plt.imshow(local_image[2])
-            plt.show()
-            exit(0)
-            images_collection[local_id[:8]]['input'] = local_image[1]
-            images_collection[local_id[:8]]['output'] = local_image[0]
-            #if 'input' in local_id:
-            #    images_collection[local_id[:8]]['input'] = local_image[1]
-            #elif 'output' in local_id:
-            #    images_collection[local_id[:8]]['output'] = local_image[0]
+
+            #plt.imshow(local_image[1])
+            #plt.show()
+            #plt.imshow(local_image[0])
+            #plt.show()
+            #plt.imshow(local_image[2])
+            #plt.show()
+            #images_collection[local_id[:8]]['input'] = local_image[1]
+            #images_collection[local_id[:8]]['output'] = local_image[0]
+            if 'input' in local_id:
+                images_collection[local_id[:8]]['input'] = local_image
+            elif 'output' in local_id:
+                images_collection[local_id[:8]]['output'] = local_image
         for local_key in images_collection.keys():
             local_image_input = images_collection[local_key]['input']
             if images_collection[local_key]['output'] is None or images_collection[local_key]['input'] is None:
@@ -249,7 +343,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             #plt.imshow(local_image_output)
             #plt.show()
             local_x_train_arr.append(
-                np.array(np.resize(np.float32(local_image), (1, 32, 32, 3))))  # self.contur_image(local_image)
+                np.array(np.resize(np.float32(np.rot90(local_image)), (1, 32, 32, 3))))  # self.contur_image(local_image)
 
             local_y_train_arr.append(np.array(np.resize(np.float32(local_image_output), (1, 32, 32, 3))))
 
@@ -265,7 +359,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         return self.decode(eps, apply_sigmoid=True)
 
     def encode(self, x_img):
-        mean, logvar = tf.split(self.encoder(inputs=np.array(x_img)), num_or_size_splits=2, axis=1)
+        mean, logvar = tf.split(self.encoder_model(inputs=[np.array(x_img)]), num_or_size_splits=2, axis=1)#np.array(x_img),
         return mean, logvar
 
     def encode_ord_dense(self, x_img, x_type):
@@ -296,11 +390,11 @@ class ImageAutoencoderDiscreteFunctions(Agent):
 
     def compute_loss(self, model, x, y, is_plot=False):
         mean, logvar = self.encode(x)
-        mean = self.custom_function_1(mean)
+        #mean = self.custom_function_1(mean)
         z = self.reparameterize(mean, logvar)
         x_logit = self.decode(z)
         self.calc_map_plot_counter += 1
-        if self.calc_map_plot_counter % 100 == 0:
+        if self.calc_map_plot_counter % 1000 == 0:
             plt.imshow(x[0])
             plt.show()
             plt.imshow(y[0])
@@ -334,12 +428,12 @@ class ImageAutoencoderDiscreteFunctions(Agent):
                     pass
                 print('local_loss', loss)
 
-            self.gradients = tape.gradient(loss, self.encoder.trainable_variables + self.decoder.trainable_variables)
+            self.gradients = tape.gradient(loss, self.encoder_model.trainable_variables + self.decoder.trainable_variables)
 
         if 'gradients' not in dir(self):
             return
         self.optimizer.apply_gradients(
-            zip(self.gradients, self.encoder.trainable_variables + self.decoder.trainable_variables))
+            zip(self.gradients, self.encoder_model.trainable_variables + self.decoder.trainable_variables))
 
         print('gradients applied')
         mean, logvar = self.encode(x_train[0])
@@ -354,7 +448,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         if re_result:
             ckpt_name = re_result.group(1)
 
-        self.encoder.save('./checkpoints/' + ckpt_name + '_encoder')
+        self.encoder_model.save('./checkpoints/' + ckpt_name + '_encoder')
         self.decoder.save('./checkpoints/' + ckpt_name + '_decoder')
         last_img = z
 

@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib import image
@@ -244,6 +245,7 @@ def find_image_by_name(img_name, path):
             ds = image.imread(local_lib[img_name])[:, :, :3]
 
             pixel_array_numpy = ds
+ 
             return pixel_array_numpy
 
     if len(local_path) > 0:
@@ -883,7 +885,7 @@ def load_id_from_csv(csv_path, data_schema_input=None, data_schema_output=None, 
     data = pd.read_csv(csv_path, low_memory=False)
     csv_reader = data.to_dict(orient='list')
     print('len(data) >= THREAD_COUNT', len(data) >= THREAD_COUNT)
-    if len(csv_reader) > THREAD_COUNT:
+    if len(csv_reader[list(csv_reader.keys())[0]]) > THREAD_COUNT:
 
         id_dict = split_dict(target_dict=csv_reader, count=THREAD_COUNT, restrict=restrict, size=size)
         data_schema = [(data_schema_input, data_schema_output)] * THREAD_COUNT
@@ -891,17 +893,20 @@ def load_id_from_csv(csv_path, data_schema_input=None, data_schema_output=None, 
         for i in range(THREAD_COUNT):
             local_dict = {}
             local_len = len(id_dict.keys()) / THREAD_COUNT
-            for local_key in list(id_dict.keys()[local_len * i:local_len * (i + 1)]):
+            for local_key in list(id_dict.keys()):# list(list(id_dict.keys())[int(local_len * i):int(local_len * (i + 1))]):
                 local_dict[local_key] = id_dict[local_key][i]
             id_list.append(local_dict)
         if restrict:
             size = [size] * THREAD_COUNT
         else:
             size = [len(id_list[0])] * THREAD_COUNT
+        restrict = [restrict] * THREAD_COUNT
         with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
+            print(csv_path[csv_path.rindex('/') + 1:csv_path.rindex('.')])
             futures = [executor.submit(worker_load_image_data_from_csv, args) for args in
-                       zip(id_list, data_schema[csv_path[csv_path.rindex('/') + 1:csv_path.rindex('.')]], size,
-                           restrict, path)]
+
+                       zip(id_list, data_schema, size,
+                           restrict, path)]#data_schema[csv_path[csv_path.rindex('/') + 1:csv_path.rindex('.')]]
             print("THREAD COUNT:", len(futures))
             results = [f.result() for f in futures]
 

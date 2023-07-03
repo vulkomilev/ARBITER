@@ -15,6 +15,7 @@ if gpus:
     except RuntimeError as e:
         # Memory growth must be set before GPUs have been initialized
         print(e)
+tf.config.run_functions_eagerly(True)
 class DenseScrable(Agent):
 
     def __init__(self,input_dict,output_dict):
@@ -51,16 +52,16 @@ class DenseScrable(Agent):
 
     def init_neural_network(self):
 
-        input_model = tf.keras.Input(shape=(8))
+        input_model = tf.keras.Input(shape=(57))
 
-        model_mid = tf.keras.layers.Dense((6))(input_model)
+        model_mid = tf.keras.layers.Dense((57))(input_model)
         model_mid = tf.keras.layers.Dense((12))(model_mid)
         model_mid = tf.keras.layers.Dense((6))(model_mid)
         model_mid = tf.keras.layers.Dense((3))(model_mid)
-        model_mid = tf.keras.layers.Dense((2))(model_mid)
+        model_mid = tf.keras.layers.Dense((1))(model_mid)
         self.model = tf.keras.Model(inputs=input_model, outputs=model_mid)
 
-        self.model.compile(optimizer="adam", loss=tf.keras.losses.MeanSquaredError())
+        self.model.compile(optimizer="adam", loss=tf.keras.losses.MeanSquaredError(), run_eagerly=True)
 
     def normalize_date(self, date_list):
         return_list = []
@@ -113,12 +114,21 @@ class DenseScrable(Agent):
 
                 if len(second_element.name) > 0:
                     local_element = element.source.get_by_name(second_element.name)
-
                     if local_element == None:
-                        local_element = 0
-                    local_list.append(local_element)
-            if len(local_list) == 8:
+                        if second_element.type == 'str':
+                         local_element = [0,0]
+                        else:
+                            local_element = 0
+                    if type(local_element) == type([]):
+
+                        local_list+=local_element
+                    else:
+                        local_list.append(local_element)
+            print(local_list)
+            if len(local_list) == 57:
              local_data_input.append(local_list)
+            else:
+                local_data_input.append(local_list+[0]*(57-len(local_list)))
         local_data_output = []
         for element in data:
             local_list = []
@@ -128,13 +138,18 @@ class DenseScrable(Agent):
                     if local_element == None:
                         local_element = 0
                     local_list.append(local_element)
+            print(local_list)
             local_data_output.append(local_list)
-        normalized_data_input = np.array(local_data_input).tolist()
-        normalized_data_output = np.array(local_data_output).tolist()
+        local_data_input = np.array(local_data_input)
+        for i in range(len(local_data_input)):
 
-        normalized_data_input = np.array(self.unlist(normalized_data_input))
-        normalized_data_output = np.array(self.unlist(normalized_data_output))
-        norm_arr_x = np.array(normalized_data_input).tolist()
+            local_data_input[i] = local_data_input[i].astype('float32')
+        normalized_data_input = local_data_input#np.array(local_data_input)#.tolist()
+        normalized_data_output = np.array(local_data_output)#.tolist()
+        normalized_data_input = np.asarray(normalized_data_input).astype('float32')
+        #normalized_data_input = np.array(self.unlist(normalized_data_input))
+        #normalized_data_output = np.array(self.unlist(normalized_data_output))
+        norm_arr_x = normalized_data_input#np.array(normalized_data_input).tolist()
         norm_arr_y = normalized_data_output
 
         return norm_arr_x, norm_arr_y
@@ -166,6 +181,7 @@ class DenseScrable(Agent):
     def predict(self, image):
 
         x_train, y_train = self.prepare_data([image], in_train=True)
+        print(x_train)
         _ = self.model.predict(x_train)
-
+        print(_)
         return abs(_[0])

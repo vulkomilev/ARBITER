@@ -34,7 +34,10 @@ class Arbiter(object):
         }
 
     def add_bundle_bucket(self,key, input_dict):
-         self.bundle_bucket[key] = input_dict
+        if type(input_dict) == type([]):
+            self.bundle_bucket[key] = input_dict[0]
+        else:
+            self.bundle_bucket[key] = input_dict
 
     def register_neural_network(self, neural_network, input_shape, output_shape,keys_ins=None,keys_out=None,local_inputs=None,local_outpus=None):
         input_list = []
@@ -140,7 +143,8 @@ class Arbiter(object):
             layer_size = len(input_list)
             self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
                 self.arbiter_neural_network_input)
-            layer_size = len(input_list) / len(list( self.registered_networks.keys()))
+            layer_size = len(input_list) #/ len(list( self.registered_networks.keys()))
+
             self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
                     self.arbiter_neural_network)
 
@@ -183,8 +187,9 @@ class Arbiter(object):
                 local_data = []
                 for element in data:
                     local_data.append(element.get_by_name(element_key.name))
-                if None in local_data:
-                  for i in range(len(local_data)):
+                #print(local_data)
+                if  any(type(x) == type(None) for x in local_data):
+                 for i in range(len(local_data)):
                     if local_data[i] == None:
                         local_data[i] = 0
                 if type(local_data) == list or type(local_data) == type(np.ndarray(shape=0)):
@@ -235,7 +240,7 @@ class Arbiter(object):
         local_key_list = list(self.bundle_bucket.keys())
         local_bundle_list = []
         for key in local_key_list:
-            local_bundle_list.append(self.bundle_bucket[key])
+             local_bundle_list.append(self.bundle_bucket[key])
 
 
         local_input_lista = generate_path_list_from_dict(self.data_schema_input, [], [], True)
@@ -245,8 +250,8 @@ class Arbiter(object):
                     local_norm_arr.append(element.source)
 
                 norm_data = self.normalize_data_bundle(local_norm_arr)
-                for key in local_key_list:
-                    set_data_by_list(self.bundle_bucket[key].source, [], norm_data)
+                for i,key in enumerate(local_key_list):
+                    set_data_by_list(self.bundle_bucket[key].source, [], norm_data,index=i)
         else:
             for element in local_input_lista:
                 local_norm_arr = []
@@ -538,9 +543,10 @@ class Arbiter(object):
         for key in list(self.bundle_bucket.keys()):
 
             results, _ = self.predict(self.bundle_bucket[key])
-
+            print('results',results)
             results = np.squeeze(results)
             results = self.denormalize(results)
+
             local_arr = []
             final_ids = []
             try:
@@ -554,11 +560,15 @@ class Arbiter(object):
             except Exception as e:
                 print(e)
                 exit(0)
-            for element in results:
+            if type(results) ==  type([]):
+              for element in results:
                 local_arr.append(element)
+            else:
+                local_arr.append(results)
             for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
                 if element == 'Turn':
                     arr_element = int(arr_element)
+
 
                 local_dict[element].append(arr_element)
             writer.writerow(local_arr)

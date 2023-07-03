@@ -2,7 +2,7 @@ import importlib
 
 from arbiter import Arbiter
 from utils.utils import CATEGORY
-from utils.utils import DataUnit
+from utils.utils import DataUnit,IMAGE
 
 print('Loading images ...')
 
@@ -456,44 +456,6 @@ agent_router = [{'DenseScrable': {'inputs': ['batch_id', 'event_id', 'first_puls
                                               {'name': 'zenith', 'type': 'float'}
 
                                               ]}}]
-                                              data_schema_input =     {
-        'defog':[
-        DataUnit('float', (), None, 'Time',is_id=True),
-        DataUnit('float', (), None, 'AccV'),
-        DataUnit('float', (), None, 'AccML'),
-        DataUnit('float', (), None, 'AccAP'),
-        DataUnit('float', (), None, 'StartHesitation'),
-        DataUnit('float', (), None, 'Turn'),
-        DataUnit('float', (), None, 'Walking'),
-        DataUnit('bool', (), None, 'Valid'),
-        DataUnit('bool', (), None, 'Task')],
-        'notype': [
-            DataUnit('float', (), None, 'Time',is_id=True),
-            DataUnit('float', (), None, 'AccV'),
-            DataUnit('float', (), None, 'AccML'),
-            DataUnit('float', (), None, 'AccAP'),
-            DataUnit('float', (), None, 'Event'),
-            DataUnit('bool', (), None, 'Valid'),
-            DataUnit('bool', (), None, 'Task')],
-        'tdcsfog': [
-            DataUnit('float', (), None, 'Time',is_id=True),
-            DataUnit('float', (), None, 'AccV'),
-            DataUnit('float', (), None, 'AccML'),
-            DataUnit('float', (), None, 'AccAP'),
-            DataUnit('float', (), None, 'StartHesitation'),
-            DataUnit('float', (), None, 'Turn'),
-            DataUnit('float', (), None, 'Walking')]
-    }
-
-data_schema_output = [
-    DataUnit('float', (), None, 'StartHesitation'),
-    DataUnit('float', (), None, 'Turn'),]
-
-agent_router = [{'DenseScrable': ''}]
-                                                """
-
-target_type = CATEGORY
-
 data_schema_input =     {
         'defog':[
 
@@ -538,6 +500,145 @@ data_schema_output = [
 
 agent_router = [{'DenseScrable': ''}]
 
+
+data_schema_input = [
+                     DataUnit('str', (), None, 'Id',is_id=True),
+                    DataUnit('float', (), None, 'AB',),
+                    DataUnit('float', (), None, 'AF',),
+                    DataUnit('float', (), None, 'AH',),
+                    DataUnit('float', (), None, 'AM',),
+                    DataUnit('float', (), None, 'AR',),
+                    DataUnit('float', (), None, 'AX',),
+                    DataUnit('float', (), None, 'AY',),
+                    DataUnit('float', (), None, 'AZ',),
+                    DataUnit('float', (), None, 'BC',),
+                    DataUnit('float', (), None, 'BD' ,),
+                    DataUnit('float', (), None, 'BN',),
+                    DataUnit('float', (), None, 'BP',),
+                    DataUnit('float', (), None, 'BQ',),
+                    DataUnit('float', (), None, 'BR',),
+                    DataUnit('float', (), None, 'BZ',),
+                    DataUnit('float', (), None, 'CB',),
+                    DataUnit('float', (), None, 'CC',),
+                    DataUnit('float', (), None, 'CD' ,),
+                    DataUnit('float', (), None, 'CF',),
+                    DataUnit('float', (), None, 'CH',),
+                    DataUnit('float', (), None, 'CL',),
+                    DataUnit('float', (), None, 'CR',),
+                    DataUnit('float', (), None, 'CS',),
+                    DataUnit('float', (), None, 'CU',),
+                    DataUnit('float', (), None, 'CW' ,),
+                    DataUnit('float', (), None, 'DA',),
+                    DataUnit('float', (), None, 'DE',),
+                    DataUnit('float', (), None, 'DF',),
+                    DataUnit('float', (), None, 'DH',),
+                    DataUnit('float', (), None, 'DI',),
+                    DataUnit('float', (), None, 'DL',),
+                    DataUnit('float', (), None, 'DN',),
+                    DataUnit('float', (), None, 'DU',),
+                    DataUnit('float', (), None, 'DV',),
+                    DataUnit('float', (), None, 'DY',),
+                    DataUnit('float', (), None, 'EB',),
+                    DataUnit('float', (), None, 'EE',),
+                    DataUnit('float', (), None, 'EG',),
+                    DataUnit('float', (), None, 'EH',),
+                    DataUnit('str', (), None, 'EJ',),
+                    DataUnit('float', (), None, 'EL',),
+                    DataUnit('float', (), None, 'EP',),
+                    DataUnit('float', (), None, 'EU',),
+                    DataUnit('float', (), None, 'FC',),
+                    DataUnit('float', (), None, 'FD' ,),
+                    DataUnit('float', (), None, 'FE',),
+                    DataUnit('float', (), None, 'FI',),
+                    DataUnit('float', (), None, 'FL',),
+                    DataUnit('float', (), None, 'FR',),
+                    DataUnit('float', (), None, 'FS',),
+                    DataUnit('float', (), None, 'GB',),
+                    DataUnit('float', (), None, 'GE',),
+                    DataUnit('float', (), None, 'GF',),
+                    DataUnit('float', (), None, 'GH',),
+                    DataUnit('float', (), None, 'GI',),
+                    DataUnit('float', (), None, 'GL',),
+                   ]
+
+data_schema_output = [
+                DataUnit('str', (), None, 'Id',is_id=True),
+                DataUnit('int', (), None, 'Class')]
+#tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
+agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
+                               'outputs':[{'name':'Image','type':IMAGE}]}}]
+                                                """
+
+target_type = CATEGORY
+
+
+
+data_schema_input = [
+                     DataUnit('str', (), None, 'Id',is_id=True),
+                    DataUnit('float', (), None, 'AB',),
+                    DataUnit('float', (), None, 'AF',),
+                    DataUnit('float', (), None, 'AH',),
+                    DataUnit('float', (), None, 'AM',),
+                    DataUnit('float', (), None, 'AR',),
+                    DataUnit('float', (), None, 'AX',),
+                    DataUnit('float', (), None, 'AY',),
+                    DataUnit('float', (), None, 'AZ',),
+                    DataUnit('float', (), None, 'BC',),
+                    DataUnit('float', (), None, 'BD' ,),
+                    DataUnit('float', (), None, 'BN',),
+                    DataUnit('float', (), None, 'BP',),
+                    DataUnit('float', (), None, 'BQ',),
+                    DataUnit('float', (), None, 'BR',),
+                    DataUnit('float', (), None, 'BZ',),
+                    DataUnit('float', (), None, 'CB',),
+                    DataUnit('float', (), None, 'CC',),
+                    DataUnit('float', (), None, 'CD' ,),
+                    DataUnit('float', (), None, 'CF',),
+                    DataUnit('float', (), None, 'CH',),
+                    DataUnit('float', (), None, 'CL',),
+                    DataUnit('float', (), None, 'CR',),
+                    DataUnit('float', (), None, 'CS',),
+                    DataUnit('float', (), None, 'CU',),
+                    DataUnit('float', (), None, 'CW' ,),
+                    DataUnit('float', (), None, 'DA',),
+                    DataUnit('float', (), None, 'DE',),
+                    DataUnit('float', (), None, 'DF',),
+                    DataUnit('float', (), None, 'DH',),
+                    DataUnit('float', (), None, 'DI',),
+                    DataUnit('float', (), None, 'DL',),
+                    DataUnit('float', (), None, 'DN',),
+                    DataUnit('float', (), None, 'DU',),
+                    DataUnit('float', (), None, 'DV',),
+                    DataUnit('float', (), None, 'DY',),
+                    DataUnit('float', (), None, 'EB',),
+                    DataUnit('float', (), None, 'EE',),
+                    DataUnit('float', (), None, 'EG',),
+                    DataUnit('float', (), None, 'EH',),
+                    DataUnit('str', (), None, 'EJ',),
+                    DataUnit('float', (), None, 'EL',),
+                    DataUnit('float', (), None, 'EP',),
+                    DataUnit('float', (), None, 'EU',),
+                    DataUnit('float', (), None, 'FC',),
+                    DataUnit('float', (), None, 'FD' ,),
+                    DataUnit('float', (), None, 'FE',),
+                    DataUnit('float', (), None, 'FI',),
+                    DataUnit('float', (), None, 'FL',),
+                    DataUnit('float', (), None, 'FR',),
+                    DataUnit('float', (), None, 'FS',),
+                    DataUnit('float', (), None, 'GB',),
+                    DataUnit('float', (), None, 'GE',),
+                    DataUnit('float', (), None, 'GF',),
+                    DataUnit('float', (), None, 'GH',),
+                    DataUnit('float', (), None, 'GI',),
+                    DataUnit('float', (), None, 'GL',),
+                   ]
+
+data_schema_output = [
+                DataUnit('str', (), None, 'Id',is_id=True),
+                DataUnit('int', (), None, 'Class')]
+#tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
+agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
+                               'outputs':[{'name':'Image','type':IMAGE}]}}]
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
 def runner(dataset_path, train_name='train', restrict=True, \
            size=10, target_name='letter', no_ids=False,
@@ -550,7 +651,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
     exec('from utils.' + utils_name + ' import image_loader')
     print('data_schema_input 1',data_schema_input)
     image_loader = importlib.import_module('utils.' + utils_name, package='.').image_loader
-
+    print(image_loader)
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name=train_file, restrict=restrict, \
                                                                  size=size, target_name='letter', no_ids=False,
@@ -562,7 +663,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
     arbiter = Arbiter(data_schema_input=data_schema_input,
                       data_schema_output=data_schema_output, target_type=target_type,
                       class_num=image_collection_train['num_classes'],
-                      router_agent=agent_router, skip_arbiter=False)
+                      router_agent=agent_router, skip_arbiter=True)
     # print(type(image_collection_train['image_arr']))
     # print(image_collection_train['image_arr'][0])
     # exit(0)
@@ -570,7 +671,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
         arbiter.add_bundle_bucket(key, image_collection_train['image_arr'][key])
     # print(image_collection_train)
     arbiter.normalize_bundle_bucket()
-    for i in range(1):
+    for i in range(1000):
         arbiter.train(force_train=True, train_arbiter=False)
     arbiter.save()
     arbiter.empty_bucket()
@@ -584,5 +685,5 @@ def runner(dataset_path, train_name='train', restrict=True, \
                                                                  dir_tree=dir_tree)
     for key in list(image_collection_train['image_arr'].keys())[:100]:
         arbiter.add_bundle_bucket(key, image_collection_train['image_arr'][key])
-    #arbiter.normalize_bundle_bucket(is_submit=True)
+    arbiter.normalize_bundle_bucket(is_submit=True)
     arbiter.submit('/kaggle/working/')

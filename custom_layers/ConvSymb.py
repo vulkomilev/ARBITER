@@ -24,6 +24,7 @@ from keras.engine.base_layer import Layer
 from keras.engine.input_spec import InputSpec
 from keras.utils import conv_utils
 import sys
+import traceback
 
 class ConvSymb(Layer):
     """Abstract N-D convolution layer (private, used as implementation base).
@@ -203,7 +204,9 @@ class ConvSymb(Layer):
             name=self.__class__.__name__,
         )
     def build(self, input_shape):
+
         input_shape = tf.TensorShape(input_shape)
+
         input_channel = self._get_input_channel(input_shape)
         if input_channel % self.groups != 0:
             raise ValueError(
@@ -217,7 +220,6 @@ class ConvSymb(Layer):
             input_channel // self.groups,
             self.filters,
         )
-
         # compute_output_shape contains some validation logic for the input
         # shape, and make sure the output shape has all positive dimensions.
         self.compute_output_shape(input_shape)
@@ -258,14 +260,20 @@ class ConvSymb(Layer):
         if self._is_causal:  # Apply causal padding to inputs for Conv1D.
             inputs = tf.pad(inputs, self._compute_causal_padding(inputs))
         if inputs.shape[3]:
+
+
+
             outputs = self.custom_function(inputs[:,:,:,:3])
+            #tb_info = traceback.extract_tb(self.custom_function(inputs[:,:,:,:3]))
+            #filename, line, func, text = tb_info[-1]
+
+            #print('An error occurred on line {} in statement {}'.format(line, text))
 
         else:
             outputs_1 = self.custom_function(inputs[:, :, :, :3])
             outputs_2 = self.custom_function(inputs[:, :, :, 3:6])
             outputs = tensorflow.concat(outputs_1,outputs_2,axis=4)
-
-        outputs = self.convolution_op(outputs, self.kernel)
+        #outputs = self.convolution_op(outputs, self.kernel)
 
         if self.use_bias:
             output_rank = outputs.shape.rank
@@ -286,6 +294,7 @@ class ConvSymb(Layer):
                         outputs, _apply_fn, inner_rank=self.rank + 1
                     )
                 else:
+
                     outputs = tf.nn.bias_add(
                         outputs, self.bias, data_format=self._tf_data_format
                     )
@@ -293,7 +302,7 @@ class ConvSymb(Layer):
         if not tf.executing_eagerly() and input_shape.rank:
             # Infer the static output shape:
             out_shape = self.compute_output_shape(input_shape)
-            outputs.set_shape(out_shape)
+            #outputs.set_shape(out_shape)
 
         if self.activation is not None:
             return self.activation(outputs)
