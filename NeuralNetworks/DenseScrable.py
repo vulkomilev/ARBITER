@@ -27,10 +27,11 @@ class DenseScrable(Agent):
         self.reg_input = []
         self.reg_output = []
         for element in input_dict:
-         if element.shape == ():
+         if element.is_id == False:
              self.reg_input.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
         for element in output_dict:
-         if element.shape == ():
+         print('element',element)
+         if element.is_id == False:
              self.reg_output.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
 
         self.init_neural_network()
@@ -54,11 +55,11 @@ class DenseScrable(Agent):
 
         input_model = tf.keras.Input(shape=(57))
 
-        model_mid = tf.keras.layers.Dense((57))(input_model)
-        model_mid = tf.keras.layers.Dense((12))(model_mid)
-        model_mid = tf.keras.layers.Dense((6))(model_mid)
-        model_mid = tf.keras.layers.Dense((3))(model_mid)
-        model_mid = tf.keras.layers.Dense((1))(model_mid)
+        model_mid = tf.keras.layers.Dense((len(self.reg_input)))(input_model)
+        model_mid = tf.keras.layers.Dense((len(self.reg_input)/2))(model_mid)
+        model_mid = tf.keras.layers.Dense((len(self.reg_input)/4))(model_mid)
+        model_mid = tf.keras.layers.Dense((len(self.reg_input)/8))(model_mid)
+        model_mid = tf.keras.layers.Dense((len(self.reg_output)))(model_mid)
         self.model = tf.keras.Model(inputs=input_model, outputs=model_mid)
 
         self.model.compile(optimizer="adam", loss=tf.keras.losses.MeanSquaredError(), run_eagerly=True)
@@ -133,12 +134,13 @@ class DenseScrable(Agent):
         for element in data:
             local_list = []
             for second_element in self.reg_output:
+                print('second_element',second_element.name)
                 if len(second_element.name) > 0:
                     local_element = element.target.get_by_name(second_element.name)
                     if local_element == None:
                         local_element = 0
                     local_list.append(local_element)
-            print(local_list)
+            print('local_list',local_list)
             local_data_output.append(local_list)
         local_data_input = np.array(local_data_input)
         for i in range(len(local_data_input)):

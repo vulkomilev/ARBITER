@@ -153,9 +153,10 @@ class ModelIOReg(object):
 
 class DataUnit(object):
 
-    def __init__(self, type_val, shape, data, name='', is_id=False, break_seq=False, break_size=100,is_file_name=False):
+    def __init__(self, type_val, shape, data, name='',load_name=None, is_id=False, break_seq=False, break_size=100,is_file_name=False):
         self.is_id = is_id
         self.is_file_name = is_file_name
+
         if type_val not in DATA_FORMATS:
             raise RuntimeError('Data type in data provided is not supported')
         if data is not None:
@@ -178,6 +179,7 @@ class DataUnit(object):
                     data = np.nan
                 else:
                     data = np.array(data, dtype=np.float)
+        self.load_name = load_name
         self.type = type_val
         self.shape = shape
         self.data = data
@@ -705,9 +707,11 @@ def worker_load_image_data_from_csv(args):
     for i in range(len(local_dict[list(local_dict.keys())[0]])):
         local_row = []
         for element in data_schema_input:
+
             if element.name in list(local_dict.keys()):
                 local_row.append(local_dict[element.name][i])
-
+            elif element.load_name != None and element.load_name in  list(local_dict.keys()):
+                local_row.append(local_dict[element.load_name][i])
             elif element.type in DATA_FORMATS_SPECIAL:
                 local_row.append(find_image_by_name (local_dict[list(local_dict.keys())[local_id_poss[0] - 1]][i],
                                                     path))
@@ -715,6 +719,7 @@ def worker_load_image_data_from_csv(args):
 
             else:
                 local_row.append(None)
+
         local_norm_list_input.append(local_row)
     local_count = 1
     for row in local_norm_list_input:
@@ -741,6 +746,8 @@ def worker_load_image_data_from_csv(args):
         for element in data_schema_output:
             if element.name in list(local_dict.keys()):
                 local_row.append(local_dict[element.name][i])
+            elif element.load_name != None and element.load_name in  list(local_dict.keys()):
+                local_row.append(local_dict[element.load_name][i])
             else:
                 local_row.append(None)
         local_norm_list_output.append(local_row)
