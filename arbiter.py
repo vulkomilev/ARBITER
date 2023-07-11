@@ -543,10 +543,10 @@ class Arbiter(object):
         for key in list(self.bundle_bucket.keys()):
 
             results, _ = self.predict(self.bundle_bucket[key])
-            print('results',results)
             results = np.squeeze(results)
             results = self.denormalize(results)
-
+            if type(results) == type(np.zeros((2))):
+                results = results.tolist()
             local_arr = []
             final_ids = []
             try:
@@ -563,8 +563,11 @@ class Arbiter(object):
             if type(results) ==  type([]):
               for element in results:
                 local_arr.append(element)
+
+
             else:
                 local_arr.append(results)
+            print('results', type(results))
             for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
                 if element == 'Turn':
                     arr_element = int(arr_element)
