@@ -635,10 +635,10 @@ data_schema_input = [
 
 data_schema_output = [
                 DataUnit('str', (), None, 'Id',is_id=True),
-                DataUnit('int', (), None, 'Class')]
+                DataUnit('int', (), None, 'class_0'),
+                DataUnit('int', (), None, 'class_1')]
 #tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
-agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
-                               'outputs':[{'name':'Image','type':IMAGE}]}}]
+agent_router = [{'DenseScrable':None}]
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
 def runner(dataset_path, train_name='train', restrict=True, \
            size=10, target_name='letter', no_ids=False,
