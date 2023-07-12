@@ -187,7 +187,7 @@ class Arbiter(object):
                 local_data = []
                 for element in data:
                     local_data.append(element.get_by_name(element_key.name))
-                #print(local_data)
+
                 if  any(type(x) == type(None) for x in local_data):
                  for i in range(len(local_data)):
                     if local_data[i] == None:
@@ -197,6 +197,7 @@ class Arbiter(object):
 
                         return_dict_min[element_key.name] = min(local_data)
                         return_dict_max[element_key.name] = max(local_data)
+
                         return_dict[element_key.name] = normalize_list(local_data, max(local_data), min(local_data),
                                                                        1.0, -1.0)
 
@@ -215,6 +216,7 @@ class Arbiter(object):
                     elif element_key.type == 'float' and element_key.is_id == False:
                         return_dict_min[element_key.name] = min(local_data)
                         return_dict_max[element_key.name] = max(local_data)
+
                         return_dict[element_key.name] = normalize_list(local_data, max(local_data), min(local_data),
                                                                        1.0, -1.0)
                     elif element_key.type == 'bool' and element_key.is_id == False:
@@ -300,6 +302,7 @@ class Arbiter(object):
         if not is_submit:
             local_arr, l_min, l_max = self.normalize(local_arr,input_bucket[0].data_schema,
                                                                          [], target='source')
+
             self.target_min = l_min
             self.target_max = l_max
         else:
@@ -544,7 +547,11 @@ class Arbiter(object):
 
             results, _ = self.predict(self.bundle_bucket[key])
             results = np.squeeze(results)
-            results = self.denormalize(results)
+            print('results',results)
+            print('self.target_min',self.target_min)
+            print('self.target_max', self.target_max)
+            #exit(0)
+            #results = self.denormalize(results)
             if type(results) == type(np.zeros((2))):
                 results = results.tolist()
             local_arr = []

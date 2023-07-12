@@ -59,7 +59,7 @@ class DenseScrable(Agent):
         model_mid = tf.keras.layers.Dense((len(self.reg_input)/2))(model_mid)
         model_mid = tf.keras.layers.Dense((len(self.reg_input)/4))(model_mid)
         model_mid = tf.keras.layers.Dense((len(self.reg_input)/8))(model_mid)
-        model_mid = tf.keras.layers.Dense((len(self.reg_output)))(model_mid)
+        model_mid = tf.keras.layers.Dense((len(self.reg_output)),activation='softmax')(model_mid)
         self.model = tf.keras.Model(inputs=input_model, outputs=model_mid)
 
         self.model.compile(optimizer="adam", loss=tf.keras.losses.MeanSquaredError(), run_eagerly=True)
