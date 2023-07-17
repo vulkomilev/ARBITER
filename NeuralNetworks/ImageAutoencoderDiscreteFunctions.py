@@ -308,42 +308,31 @@ class ImageAutoencoderDiscreteFunctions(Agent):
 
         for image in images:
 
-            local_image = image.source.get_by_name('Image')
+            local_image_input = image.source.get_by_name('Image')
+            local_image_output = image.target.get_by_name('Image')
             local_id = str(image.source.get_by_name('Id'))
-
+            if local_image_output == None:
+                continue
             if local_id[:8] not in images_collection.keys():
                 images_collection[local_id[:8]] = {'input': None, 'output': None}
 
-            #plt.imshow(local_image[1])
-            #plt.show()
-            #plt.imshow(local_image[0])
-            #plt.show()
-            #plt.imshow(local_image[2])
-            #plt.show()
-            #images_collection[local_id[:8]]['input'] = local_image[1]
-            #images_collection[local_id[:8]]['output'] = local_image[0]
-            if 'input' in local_id:
-                images_collection[local_id[:8]]['input'] = local_image
-            elif 'output' in local_id:
-                images_collection[local_id[:8]]['output'] = local_image
-        for local_key in images_collection.keys():
-            local_image_input = images_collection[local_key]['input']
-            if images_collection[local_key]['output'] is None or images_collection[local_key]['input'] is None:
-                continue
+            # for i in range(len(local_image_input)):
+            plt.imshow(np.array(local_image_input) / 256.0)
 
-            local_image_output = images_collection[local_key]['output']
+            plt.imshow(np.array(local_image_output) / 256.0)
+
             if type(local_image_output) == type(None) or type(local_image_input) == type(None):
                 continue
             # plt.imshow(local_image_output[2])
             # plt.show()
             local_image = copy.deepcopy(
                 local_image_input)  # np.concatenate((local_image_input, local_image_output), axis=0)
-            #plt.imshow(local_image_input)
-            #plt.show()
-            #plt.imshow(local_image_output)
-            #plt.show()
+            # plt.imshow(local_image_input)
+            # plt.show()
+            # plt.imshow(local_image_output)
+            # plt.show()
             local_x_train_arr.append(
-                np.array(np.resize(np.float32(np.rot90(local_image)), (1, 32, 32, 3))))  # self.contur_image(local_image)
+                np.array(np.resize(np.float32(local_image_input), (1, 32, 32, 3))))  # self.contur_image(local_image)
 
             local_y_train_arr.append(np.array(np.resize(np.float32(local_image_output), (1, 32, 32, 3))))
 
@@ -394,7 +383,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         z = self.reparameterize(mean, logvar)
         x_logit = self.decode(z)
         self.calc_map_plot_counter += 1
-        if self.calc_map_plot_counter % 1000 == 0:
+        if self.calc_map_plot_counter % 10000 == 0:
             plt.imshow(x[0])
             plt.show()
             plt.imshow(y[0])
@@ -415,7 +404,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         if only_fill:
             return
         x_train, y_train, func_name = self.prepare_data(self.local_image_list, in_train=True)
-
+        print('prepare_data done',x_train,y_train)
         for x, y in zip(x_train, y_train):
 
             with tf.GradientTape(persistent=True) as tape:

@@ -563,14 +563,14 @@ data_schema_input = [
 
 data_schema_output = [
                 DataUnit('str', (), None, 'Id',is_id=True),
-                DataUnit('int', (), None, 'Class')]
+                DataUnit('int', (), None, 'class_0',load_name='DL'),
+                DataUnit('int', (), None, 'class_1',load_name='FR')]
 #tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
 agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
                                'outputs':[{'name':'Image','type':IMAGE}]}}]
                                                 """
 
 target_type = CATEGORY
-
 
 
 data_schema_input = [
@@ -635,11 +635,11 @@ data_schema_input = [
 
 data_schema_output = [
                 DataUnit('str', (), None, 'Id',is_id=True),
-                DataUnit('int', (), None, 'class_0',load_name='DL'),
-                DataUnit('int', (), None, 'class_1',load_name='FR')]
-
+                DataUnit('int', (), None, 'DL',load_name='DL'),
+                DataUnit('int', (), None, 'FR',load_name='FR')]
 #tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
-agent_router = [{'DenseScrable':None}]
+agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
+                               'outputs':[{'name':'Image','type':IMAGE}]}}]
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
 def runner(dataset_path, train_name='train', restrict=True, \
            size=10, target_name='letter', no_ids=False,
@@ -660,6 +660,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
                                                                  data_schema_output=data_schema_output,
                                                                  split=split, THREAD_COUNT_V=THREAD_COUNT,
                                                                  dir_tree=dir_tree)
+    print('data_bundle_list',len(image_collection_train['image_arr']))
     print('DATA COLLECTED')
     arbiter = Arbiter(data_schema_input=data_schema_input,
                       data_schema_output=data_schema_output, target_type=target_type,
@@ -668,11 +669,17 @@ def runner(dataset_path, train_name='train', restrict=True, \
     # print(type(image_collection_train['image_arr']))
     # print(image_collection_train['image_arr'][0])
     # exit(0)
-    for key in list(image_collection_train['image_arr'].keys()):
+
+    if type(image_collection_train['image_arr']) == type([]):
+        for i, element in zip(range(len(image_collection_train['image_arr'])),image_collection_train['image_arr']):
+            arbiter.add_bundle_bucket(i,element)
+    else:
+     for key in list(image_collection_train['image_arr'].keys()):
         arbiter.add_bundle_bucket(key, image_collection_train['image_arr'][key])
+
     # print(image_collection_train)
     arbiter.normalize_bundle_bucket()
-    for i in range(1000):
+    for i in range(2000):
         arbiter.train(force_train=True, train_arbiter=False)
     arbiter.save()
     arbiter.empty_bucket()
