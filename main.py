@@ -635,8 +635,8 @@ data_schema_input = [
 
 data_schema_output = [
                 DataUnit('str', (), None, 'Id',is_id=True),
-                DataUnit('int', (), None, 'DL',load_name='DL'),
-                DataUnit('int', (), None, 'FR',load_name='FR')]
+                DataUnit('int', (), None, 'class_0',load_name='DL'),
+                DataUnit('int', (), None, 'class_1',load_name='FR')]
 #tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
 agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
                                'outputs':[{'name':'Image','type':IMAGE}]}}]
