@@ -181,7 +181,7 @@ class DenseScrable(Agent):
         pass
 
     def predict(self, image):
-
+        print("predict")
         x_train, y_train = self.prepare_data([image], in_train=True)
         print(x_train)
         _ = self.model.predict(x_train)

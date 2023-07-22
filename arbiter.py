@@ -583,5 +583,3 @@ class Arbiter(object):
                 local_dict[element].append(arr_element)
             writer.writerow(local_arr)
 
-
-        writer.writerow([])
