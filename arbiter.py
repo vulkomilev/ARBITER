@@ -569,11 +569,12 @@ class Arbiter(object):
                 exit(0)
             if type(results) ==  type([]):
               for element in results:
-                local_arr.append(round(element,2))
+
+                local_arr.append(element)
 
 
             else:
-                local_arr.append(round(results,2))
+                local_arr.append(results)
             print('results', type(results))
             for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
                 if element == 'Turn':
