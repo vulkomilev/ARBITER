@@ -174,7 +174,7 @@ class DenseScrable(Agent):
         else:
             print('==============')
             self.model.fit(np.array(x_train), np.array(y_train), batch_size=32, epochs=1)
-            self.model.save('./checkpoints/' + ckpt_name)
+            #self.model.save('./checkpoints/' + ckpt_name)
         self.local_bucket = []
 
     def save(self):

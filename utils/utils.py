@@ -497,7 +497,7 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
         train_cutoff = int(split_coef * len(local_image_collection['image_arr']))
         if not load_image:
             key_list = list(image_ids.keys())
-            random.shuffle(key_list)
+            #random.shuffle(key_list)
             train_cutoff = int(split_coef * len(key_list))
             for i in range(0, train_cutoff):
                 train_arr[key_list[i]] = image_ids[key_list[i]]
@@ -521,14 +521,14 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
         if not load_image:
             if type(image_ids) == type({}):
                 key_list = list(image_ids.keys())
-                random.shuffle(key_list)
+                #random.shuffle(key_list)
                 train_cutoff = int(len(key_list))
                 for i in range(0, train_cutoff):
                     train_arr[key_list[i]] = (image_ids[key_list[i]])
                 return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}, {
                     'num_classes': local_image_collection['num_classes'], 'image_arr': []}
             elif type(image_ids) == type([]):
-                random.shuffle(image_ids)
+                #random.shuffle(image_ids)
                 train_cutoff = int(len(image_ids))
                 for i in range(0, train_cutoff):
                     train_arr[i] = (image_ids[i])
@@ -536,7 +536,7 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
                     'num_classes': local_image_collection['num_classes'], 'image_arr': []}
         else:
             key_list = list(image_ids.keys())
-            random.shuffle(key_list)
+            #random.shuffle(key_list)
             for i in range(0, train_cutoff):
                 train_arr[image_ids[i]] = (image_ids[key_list[i]])
 
