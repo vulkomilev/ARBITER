@@ -501,6 +501,7 @@ data_schema_output = [
 agent_router = [{'DenseScrable': ''}]
 
 
+
 data_schema_input = [
                      DataUnit('str', (), None, 'Id',is_id=True),
                     DataUnit('float', (), None, 'AB',),
@@ -568,9 +569,11 @@ data_schema_output = [
 #tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
 agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
                                'outputs':[{'name':'Image','type':IMAGE}]}}]
+
                                                 """
 
 target_type = CATEGORY
+
 
 
 data_schema_input = [

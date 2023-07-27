@@ -233,7 +233,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             return tf.reduce_sum(tf.math.squared_difference(result, inputs[:][32:][:][:]), keepdims=True)
             #return inputs
 
-        '''
+
         self.encoder = tf.keras.Sequential([
             tf.keras.layers.InputLayer(input_shape=(width_img, height_img, depth_img)),
             tf.keras.layers.Dense(3, activation='relu'),
@@ -271,7 +271,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         self.encoder = tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu')(self.encoder)
         self.encoder = tf.keras.layers.Dense(latent_dim + latent_dim, activation='gelu')(self.encoder)
         self.encoder_model = tf.keras.Model(inputs=[self.encoder_input_2],outputs= self.encoder)#self.encoder_input_1,
-
+        '''
 
         self.decoder = tf.keras.Sequential(
             [
@@ -348,7 +348,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         return self.decode(eps, apply_sigmoid=True)
 
     def encode(self, x_img):
-        mean, logvar = tf.split(self.encoder_model(inputs=[np.array(x_img)]), num_or_size_splits=2, axis=1)#np.array(x_img),
+        mean, logvar = tf.split(self.encoder(inputs=[np.array(x_img)]), num_or_size_splits=2, axis=1)#np.array(x_img),
         return mean, logvar
 
     def encode_ord_dense(self, x_img, x_type):
@@ -417,12 +417,12 @@ class ImageAutoencoderDiscreteFunctions(Agent):
                     pass
                 print('local_loss', loss)
 
-            self.gradients = tape.gradient(loss, self.encoder_model.trainable_variables + self.decoder.trainable_variables)
+            self.gradients = tape.gradient(loss, self.encoder.trainable_variables + self.decoder.trainable_variables)
 
         if 'gradients' not in dir(self):
             return
         self.optimizer.apply_gradients(
-            zip(self.gradients, self.encoder_model.trainable_variables + self.decoder.trainable_variables))
+            zip(self.gradients, self.encoder.trainable_variables + self.decoder.trainable_variables))
 
         print('gradients applied')
         mean, logvar = self.encode(x_train[0])
@@ -437,7 +437,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         if re_result:
             ckpt_name = re_result.group(1)
 
-        self.encoder_model.save('./checkpoints/' + ckpt_name + '_encoder')
+        self.encoder.save('./checkpoints/' + ckpt_name + '_encoder')
         self.decoder.save('./checkpoints/' + ckpt_name + '_decoder')
         last_img = z
 
