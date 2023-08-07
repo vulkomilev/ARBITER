@@ -125,20 +125,6 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         self.func_arr = [[], []]
         conn1, conn2 = Pipe()
         self.conn_send = conn2
-        # Initialize the Model Card Toolkit with a path to store generate assets
-        model_card_output_path = './'
-        mct = model_card_toolkit.ModelCardToolkit(model_card_output_path)
-
-        # Initialize the model_card_toolkit.ModelCard, which can be freely populated
-        model_card = mct.scaffold_assets()
-        model_card.model_details.name = 'My Model'
-
-        # Write the model card data to a proto file
-        mct.update_model_card(model_card)
-
-        # Return the model card document as an HTML page
-        html = mct.export_format()
-
         # p = Process(target=runGraph, args=(conn1,))
         # p.start()
 
