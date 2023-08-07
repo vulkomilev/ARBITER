@@ -12,10 +12,10 @@ if gpus:
     print(e)
 #dataset_path = "./data_sets/tlvmc-parkinsons-freezing-gait-prediction/train/"
 #dataset_path = "./data_sets/abstraction-and-reasoning-challenge/training/"
-dataset_path = "./data_sets/icr-identify-age-related-conditions/"
+dataset_path = "./data_sets/commonlit-evaluate-student-summaries/"
 runner(dataset_path, train_name='test_images', restrict=False,
        size=3, target_name='letter', no_ids=False,
        submit_file='test',
        train_file='train',
-       #utils_name='specific_loaders.abstractionAndReasoning',
-       split=False, THREAD_COUNT=32, dir_tree=False)
+       utils_name='specific_loaders.commonLitLoader',
+       split=False, THREAD_COUNT=4, dir_tree=True)

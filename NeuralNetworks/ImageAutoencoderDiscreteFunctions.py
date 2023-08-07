@@ -12,6 +12,8 @@ from multiprocessing import Pipe
 import cv2
 from utils.utils import DataUnit
 import copy
+import model_card_toolkit
+
 
 import traceback
 last_img = np.zeros((100, 1))
@@ -124,6 +126,20 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         self.func_arr = [[], []]
         conn1, conn2 = Pipe()
         self.conn_send = conn2
+        # Initialize the Model Card Toolkit with a path to store generate assets
+        model_card_output_path = './'
+        mct = model_card_toolkit.ModelCardToolkit(model_card_output_path)
+
+        # Initialize the model_card_toolkit.ModelCard, which can be freely populated
+        model_card = mct.scaffold_assets()
+        model_card.model_details.name = 'My Model'
+
+        # Write the model card data to a proto file
+        mct.update_model_card(model_card)
+
+        # Return the model card document as an HTML page
+        html = mct.export_format()
+
         # p = Process(target=runGraph, args=(conn1,))
         # p.start()
 
@@ -242,7 +258,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
             ConvSymb(kernel_size=1,
                      filters=3, rank=2, custom_function=custom_func, strides=(1, 1), activation='relu'),
             ConvSymb(kernel_size=1,
-                     filters=6, rank=2, custom_function=custom_func, strides=(1, 1), activation='relu'),
+                     filters=3, rank=2, custom_function=custom_func, strides=(1, 1), activation='relu'),
             tf.keras.layers.Flatten(),
             tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu'),
             tf.keras.layers.Dense(latent_dim + latent_dim, activation='relu'),
@@ -383,7 +399,7 @@ class ImageAutoencoderDiscreteFunctions(Agent):
         z = self.reparameterize(mean, logvar)
         x_logit = self.decode(z)
         self.calc_map_plot_counter += 1
-        if self.calc_map_plot_counter % 10000 == 0:
+        if self.calc_map_plot_counter % 100 == 0:
             plt.imshow(x[0])
             plt.show()
             plt.imshow(y[0])
