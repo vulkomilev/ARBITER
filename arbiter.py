@@ -522,7 +522,7 @@ class Arbiter(object):
             return data
 
     def submit(self, file_dest=''):
-        shutil.copyfile('../input/arbiter/arbiter/sample_submission.csv', '/kaggle/working/submission.csv')
+        shutil.copyfile('/kaggle/input/commonlit-evaluate-student-summaries/sample_submission.csv', '/kaggle/working/submission.csv')
         return
         f = open(file_dest + 'submission.csv', 'w+')
         writer = csv.writer(f)
