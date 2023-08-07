@@ -12,7 +12,6 @@ from multiprocessing import Pipe
 import cv2
 from utils.utils import DataUnit
 import copy
-import model_card_toolkit
 
 
 import traceback
