@@ -179,7 +179,7 @@ class DataUnit(object):
                 if np.isnan(data):
                     data = np.nan
                 else:
-                    data = np.array(data, dtype=np.float)
+                    data = np.array(data, dtype=np.float64)
         self.load_name = load_name
         self.type = type_val
         self.shape = shape
@@ -470,9 +470,14 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
                  dir_tree=False):
     global THREAD_COUNT
     global train_df, valid_df
+    global GLOBAL_DATA
+    global GLOBAL_ID_DATA
     THREAD_COUNT = THREAD_COUNT_V
+    GLOBAL_DATA = {}
+    GLOBAL_ID_DATA = {}
     image_paths = image_list(path + 'train_images/')
     image_ids = None
+    print('data_schema_input',data_schema_input)
     image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input, data_schema_output, restrict,
                                                                size)
     print('csv load done')
@@ -652,6 +657,8 @@ def worker_load_image_data_from_dir_tree_csv(args):
 
 def map_schema_data_rec(data, schema, path):
     return_dict = {}
+    print('data',data)
+    print('schema',schema)
     if type(schema) == type({}):
         for key in list(schema.keys()):
             return_dict[key] = map_schema_data_rec(data[key], schema[key], path)
@@ -825,7 +832,7 @@ def recursiv_match(input_dict, data_schema, key=''):
         id_list_ordered = split_list(target_list=array_id, count=THREAD_COUNT, restrict=False, size=100)
         input_dict_splited = [input_dict] * THREAD_COUNT
         array_id_splited = [array_id] * THREAD_COUNT
-        average_len = [len(id_list_ordered)] * THREAD_COUNT
+        average_len = [len(id_list_ordered[0])] * THREAD_COUNT
         back_keys = [GLOBAL_DATA.keys()] * THREAD_COUNT
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = [executor.submit(fill_global_id_data, args) for args in

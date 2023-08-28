@@ -15,7 +15,7 @@ if gpus:
 dataset_path = "./data_sets/commonlit-evaluate-student-summaries/"
 runner(dataset_path, train_name='test_images', restrict=False,
        size=3, target_name='letter', no_ids=False,
-       submit_file='test',
+       submit_file='prompts_test',
        train_file='train',
        utils_name='specific_loaders.commonLitLoader',
        split=False, THREAD_COUNT=4, dir_tree=True)

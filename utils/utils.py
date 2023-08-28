@@ -469,7 +469,11 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
                  dir_tree=False):
     global THREAD_COUNT
     global train_df, valid_df
+    global GLOBAL_DATA
+    global GLOBAL_ID_DATA
     THREAD_COUNT = THREAD_COUNT_V
+    GLOBAL_DATA = {}
+    GLOBAL_ID_DATA = {}
     image_paths = image_list(path + 'train_images/')
     image_ids = None
     if Path(path + train_name + '.csv').exists():
@@ -559,10 +563,14 @@ def generate_path_list_from_dict(input_dict, key_list, return_list, is_first=Tru
 
 
 def get_data_by_list(input_dict, key_list):
+    print('input_dict',input_dict)
     if type(input_dict) != type({}):
         return input_dict
     if len(key_list) > 0:
-        return get_data_by_list(input_dict[key_list[0]], key_list[1:])
+        if type(key_list) ==  type('s'):
+            return get_data_by_list(input_dict[key_list], key_list[1:])
+        elif type(key_list) ==  type([]):
+            return get_data_by_list(input_dict[key_list[0]], key_list[1:])
     return input_dict
 
 

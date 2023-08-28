@@ -21,7 +21,7 @@ class SwinTransformer(object):
             self.num_classes = 100
             loss = 'categorical_crossentropy'
         cfg = cfgs[model_name]
-        net = SwinTransformerModel(
+        net = SwinTransformer(
             model_name=model_name, include_top=include_top, num_classes=num_classes, img_size=cfg['input_size'],
             window_size=cfg[
                 'window_size'], embed_dim=cfg['embed_dim'], depths=cfg['depths'], num_heads=cfg['num_heads']

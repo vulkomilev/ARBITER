@@ -575,26 +575,18 @@ agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
 target_type = CATEGORY
 
 data_schema_input = {"summaries_train":
-                         [DataUnit('str', (), None, 'student_id'),
-                          DataUnit('str', (), None, 'prompt_id', is_id=True),
-                          DataUnit('str', (), None, 'text', ),
-                          DataUnit('float', (), None, 'content', ),
-                          DataUnit('float', (), None, 'wording', )],
-                     "prompts_train":
-                         [DataUnit('str', (), None, 'prompt_id', is_id=True),
-                          DataUnit('str', (), None, 'prompt_question', ),
-                          DataUnit('str', (), None, 'prompt_title', ),
-                          DataUnit('str', (), None, 'prompt_text', )],
+                         [DataUnit('str', (), None, 'student_id', is_id=True),
+                          DataUnit('str', (), None, 'prompt_id'),
+                          DataUnit('str', (), None, 'text', )],
                      }
 
-data_schema_output = [
+data_schema_output = {'summaries_train':[
     DataUnit('str', (), None, 'student_id', is_id=True),
     DataUnit('float', (), None, 'content', ),
-    DataUnit('float', (), None, 'wording', )
-]
+    DataUnit('float', (), None, 'wording', )]}
+
 # tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
-agent_router = [{'ImageAutoencoderDiscreteFunctions': {'inputs': ['Image', 'Id'],
-                                                       'outputs': [{'name': 'Image', 'type': IMAGE}]}}]
+agent_router = [{'DenseAndTransformers':None}]
 
 
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
@@ -634,20 +626,37 @@ def runner(dataset_path, train_name='train', restrict=True, \
             arbiter.add_bundle_bucket(key, image_collection_train['image_arr'][key])
 
     # print(image_collection_train)
-    arbiter.normalize_bundle_bucket()
-    for i in range(2000):
+   # arbiter.normalize_bundle_bucket()
+    for i in range(10):
+        print('-------')
         arbiter.train(force_train=True, train_arbiter=False)
     arbiter.save()
     arbiter.empty_bucket()
+    data_schema_input_test = {"summaries_test":
+                             [DataUnit('str', (), None, 'student_id', is_id=True),
+                              DataUnit('str', (), None, 'prompt_id'),
+                              DataUnit('str', (), None, 'text', )],
+                         }
 
+    data_schema_output_test = {'summaries_test': [
+        DataUnit('str', (), None, 'student_id', is_id=True),
+        DataUnit('float', (), None, 'content', ),
+        DataUnit('float', (), None, 'wording', )]}
+    arbiter.remap_registered_networks("summaries_test","summaries_test")
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name=submit_file, restrict=restrict, \
                                                                  size=size, target_name='letter', no_ids=False,
-                                                                 data_schema_input=data_schema_input,
-                                                                 data_schema_output=data_schema_output,
-                                                                 split=split, THREAD_COUNT_V=THREAD_COUNT,
+                                                                 data_schema_input=data_schema_input_test,
+                                                                 data_schema_output=data_schema_output_test,
+                                                                 split=split, THREAD_COUNT_V=1,
                                                                  dir_tree=dir_tree)
-    for key in list(image_collection_train['image_arr'].keys())[:100]:
-        arbiter.add_bundle_bucket(key, image_collection_train['image_arr'][key])
-    arbiter.normalize_bundle_bucket(is_submit=True)
+    print("image_collection_train['image_arr']",len(image_collection_train['image_arr']))
+
+    if type(image_collection_train['image_arr']) == type([]):
+        for i, element in zip(range(len(image_collection_train['image_arr'])), image_collection_train['image_arr']):
+            arbiter.add_bundle_bucket(i, element)
+    else:
+        for key in list(image_collection_train['image_arr'].keys()):
+            arbiter.add_bundle_bucket(key, image_collection_train['image_arr'][key])
+    #arbiter.normalize_bundle_bucket(is_submit=True)
     arbiter.submit('/kaggle/working/')

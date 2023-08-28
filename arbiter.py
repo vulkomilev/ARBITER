@@ -11,8 +11,9 @@ import pyarrow.parquet as pq
 from  pandas import DataFrame
 from NeuralNetworks.DenseScrable import DenseScrable
 from NeuralNetworks.CellularAutomataAndData import CellularAutomataAndData
-from NeuralNetworks.ImageAutoencoderDiscreteFunctions import ImageAutoencoderDiscreteFunctions
+#from NeuralNetworks.ImageAutoencoderDiscreteFunctions import ImageAutoencoderDiscreteFunctions
 from NeuralNetworks.ImageAndData import ImageAndData
+from NeuralNetworks.DenseAndTransformers import  DenseAndTransformers
 
 
 class Arbiter(object):
@@ -97,19 +98,43 @@ class Arbiter(object):
                                                             'output_path':keys_out,
                                                             'output_list': register_output}
 
+    def remap_registered_networks(self,new_input_path,new_output_path):
+        for element in self.registered_networks.keys():
+                self.registered_networks[element]['input_path'] = new_input_path
+                self.registered_networks[element]['output_path'] = new_output_path
+
     def init_neural_network(self):
         input_list = []
         output_len = 0
-        for i in range(len(list( self.registered_networks.keys()))):
-            for element in self.data_schema_output:
-                if not element.is_id:
-                    if element.shape == ():
-                        input_list.append(1)
-                    else:
-                        input_list.append(element.shape)
+        if type(self.data_schema_output) == type({}):
+            for local_key in list(self.data_schema_output.keys()):
+                for i in range(len(list(self.registered_networks.keys()))):
+                    for element in self.data_schema_output[local_key]:
+                        if not element.is_id:
+                            if element.shape == ():
+                                input_list.append(1)
+                            else:
+                                input_list.append(element.shape)
 
+        else:
+            for i in range(len(list( self.registered_networks.keys()))):
+                for element in self.data_schema_output:
+                    if not element.is_id:
+                        if element.shape == ():
+                            input_list.append(1)
+                        else:
+                            input_list.append(element.shape)
 
-        for element in self.data_schema_output:
+        if type(self.data_schema_output) == type({}):
+           for local_key in list(self.data_schema_output.keys()):
+               for element in self.data_schema_output[local_key]:
+                   if not element.is_id:
+                       if element.shape == ():
+                           output_len += 1
+                       elif type(element.shape) == type((1, 2)):
+                           output_len = element.shape
+        else:
+         for element in self.data_schema_output:
             if not element.is_id:
                 if element.shape == ():
                     output_len += 1
@@ -348,7 +373,7 @@ class Arbiter(object):
             model_io_reg
 
     def train(self, force_train=False, train_arbiter=True):
-
+        print("   self.registered_networks[element]['neural_network']",   self.registered_networks)
         for key in list(self.bundle_bucket.keys()):
             for element in self.registered_networks.keys():
 
@@ -495,14 +520,19 @@ class Arbiter(object):
 
     def get_schema_names(self, schema):
         return_list = []
+        return_ids = []
         if type(schema) is dict:
             for element_key in schema.keys():
                 local_element = schema[element_key]
-                return_list += self.get_schema_names(local_element)
+                l,ids = self.get_schema_names(local_element)
+                return_list += l
+                return_ids += ids
         elif type(schema) is list:
             for element in schema:
                 return_list.append(element.name)
-        return return_list
+                if element.is_id:
+                    return_ids.append(element.name)
+        return return_list,return_ids
     def get_data_ids(self, data,id_dict):
         if type(data) is dict:
             for element_key in data.keys():
@@ -522,8 +552,7 @@ class Arbiter(object):
             return data
 
     def submit(self, file_dest=''):
-        shutil.copyfile('/kaggle/input/commonlit-evaluate-student-summaries/sample_submission.csv', '/kaggle/working/submission.csv')
-        return
+
         f = open(file_dest + 'submission.csv', 'w+')
         writer = csv.writer(f)
         local_arr = []
@@ -541,18 +570,19 @@ class Arbiter(object):
                   local_arr.append(element.name)
 
         else:
-            local_arr = self.get_schema_names(self.data_schema_output)
-
-        for element in self.get_schema_names(self.data_schema_output):
+            local_arr,local_ids = self.get_schema_names(self.data_schema_output)
+        for element in local_ids:
+            output_id_dict[element] = None
+        for element in local_arr:
             local_dict[element] = []
         writer.writerow(local_arr)
         for key in list(self.bundle_bucket.keys()):
 
             results, _ = self.predict(self.bundle_bucket[key])
             results = np.squeeze(results)
-            print('results',results)
-            print('self.target_min',self.target_min)
-            print('self.target_max', self.target_max)
+            print('results 1',results)
+            #print('self.target_min',self.target_min)
+            #print('self.target_max', self.target_max)
             #exit(0)
             #results = self.denormalize(results)
             if type(results) == type(np.zeros((2))):
@@ -562,12 +592,13 @@ class Arbiter(object):
             try:
                 local_id_dict = copy.deepcopy(output_id_dict)
                 self.get_data_ids(self.bundle_bucket[key].source,local_id_dict)
-                for element in self.data_schema_output:
-                    if element.is_id:
-                        final_ids.append(str(local_id_dict[element.name]))
-                print(final_ids)
+                print('data_schema_output',self.data_schema_output)
+                for element in local_ids:
+                        final_ids.append(str(local_id_dict[element]))
+                print('final_ids',final_ids)
                 local_arr.append('_'.join(final_ids).replace('.csv',''))
-            except Exception as e:
+                print('local_arr',local_arr)
+            except IOError as e:
                 print(e)
                 exit(0)
             if type(results) ==  type([]):
@@ -578,12 +609,12 @@ class Arbiter(object):
 
             else:
                 local_arr.append(round(results,4))
-            print('results', type(results))
+            print('results 2', type(results))
             for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
                 if element == 'Turn':
                     arr_element = int(arr_element)
 
 
-                local_dict[element].append(arr_element)
+                #local_dict[element].append(arr_element)
             writer.writerow(local_arr)
 
