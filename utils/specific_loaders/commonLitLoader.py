@@ -477,7 +477,6 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
     GLOBAL_ID_DATA = {}
     image_paths = image_list(path + 'train_images/')
     image_ids = None
-    print('data_schema_input',data_schema_input)
     image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input, data_schema_output, restrict,
                                                                size)
     print('csv load done')
@@ -657,8 +656,6 @@ def worker_load_image_data_from_dir_tree_csv(args):
 
 def map_schema_data_rec(data, schema, path):
     return_dict = {}
-    print('data',data)
-    print('schema',schema)
     if type(schema) == type({}):
         for key in list(schema.keys()):
             return_dict[key] = map_schema_data_rec(data[key], schema[key], path)

@@ -373,7 +373,6 @@ class Arbiter(object):
             model_io_reg
 
     def train(self, force_train=False, train_arbiter=True):
-        print("   self.registered_networks[element]['neural_network']",   self.registered_networks)
         for key in list(self.bundle_bucket.keys()):
             for element in self.registered_networks.keys():
 
@@ -580,7 +579,6 @@ class Arbiter(object):
 
             results, _ = self.predict(self.bundle_bucket[key])
             results = np.squeeze(results)
-            print('results 1',results)
             #print('self.target_min',self.target_min)
             #print('self.target_max', self.target_max)
             #exit(0)
@@ -592,12 +590,9 @@ class Arbiter(object):
             try:
                 local_id_dict = copy.deepcopy(output_id_dict)
                 self.get_data_ids(self.bundle_bucket[key].source,local_id_dict)
-                print('data_schema_output',self.data_schema_output)
                 for element in local_ids:
                         final_ids.append(str(local_id_dict[element]))
-                print('final_ids',final_ids)
                 local_arr.append('_'.join(final_ids).replace('.csv',''))
-                print('local_arr',local_arr)
             except IOError as e:
                 print(e)
                 exit(0)
@@ -609,7 +604,6 @@ class Arbiter(object):
 
             else:
                 local_arr.append(round(results,4))
-            print('results 2', type(results))
             for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
                 if element == 'Turn':
                     arr_element = int(arr_element)

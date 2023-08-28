@@ -563,7 +563,6 @@ def generate_path_list_from_dict(input_dict, key_list, return_list, is_first=Tru
 
 
 def get_data_by_list(input_dict, key_list):
-    print('input_dict',input_dict)
     if type(input_dict) != type({}):
         return input_dict
     if len(key_list) > 0:
@@ -643,7 +642,6 @@ def worker_load_image_data_from_dir_tree_csv(args):
     schema_transformed = {}
     for element in local_list:
         element_tree = element.split('/')
-        print('==============')
         create_dict_path_recs(GLOBAL_DATA, element_tree[:1])
         if os.path.exists(dir_path + element):
             df = pd.read_csv(dir_path + element,low_memory=False)
@@ -917,7 +915,6 @@ def load_id_from_csv(csv_path, data_schema_input=None, data_schema_output=None, 
             size = [len(id_list[0])] * THREAD_COUNT
         restrict = [restrict] * THREAD_COUNT
         with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
-            print(csv_path[csv_path.rindex('/') + 1:csv_path.rindex('.')])
             futures = [executor.submit(worker_load_image_data_from_csv, args) for args in
 
                        zip(id_list, data_schema, size,
