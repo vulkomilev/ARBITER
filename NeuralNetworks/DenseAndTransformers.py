@@ -10,8 +10,6 @@ import tensorflow as tf
 import os
 import tensorflow_datasets as tfds
 import json
-import tensorflow_models as tfm
-nlp = tfm.nlp
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -38,19 +36,10 @@ batch_size = 32
 glue, info = tfds.load('glue/mrpc',
                        with_info=True,
                        batch_size=32)
-tokenizer = tfm.nlp.layers.FastWordpieceBertTokenizer(
-    vocab_file=os.path.join(gs_folder_bert, "vocab.txt"),
-    lower_case=True)
 
-tokens = tokenizer(tf.constant(["Hello TensorFlow!"]))
 
 bert_config_file = os.path.join(gs_folder_bert, "bert_config.json")
 config_dict = json.loads(tf.io.gfile.GFile(bert_config_file).read())
-
-encoder_config = tfm.nlp.encoders.EncoderConfig({
-    'type': 'bert',
-    'bert': config_dict
-})
 
 
 bert_encoder = tfm.nlp.encoders.build_encoder(encoder_config)
@@ -105,26 +94,16 @@ class BertInputProcessor(tf.keras.layers.Layer):
 
 max_seq_length = 128
 
-packer = tfm.nlp.layers.BertPackInputs(
-    seq_length=max_seq_length,
-    special_tokens_dict = tokenizer.get_special_tokens_dict())
+
 sentences1 = ["hello tensorflow"]
-tok1 = tokenizer(sentences1)
 
 sentences2 = ["goodbye tensorflow"]
-tok2 = tokenizer(sentences2)
 
-packed = packer([tok1, tok2])
-bert_inputs_processor = BertInputProcessor(tokenizer, packer)
 #glue_train = glue['train'].map(bert_inputs_processor).prefetch(1)
 
 #example_inputs, example_labels = next(iter(glue_train))
 #bert_classifier(
  #   example_inputs, training=True).numpy()[:10]
-
-checkpoint = tf.train.Checkpoint(encoder=bert_encoder)
-checkpoint.read(
-    os.path.join(gs_folder_bert, 'bert_model.ckpt')).assert_consumed()
 
 epochs = 1
 batch_size = 32
@@ -141,24 +120,14 @@ linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
     end_learning_rate=0,
     decay_steps=num_train_steps)
 
-warmup_schedule = tfm.optimization.lr_schedule.LinearWarmup(
-    warmup_learning_rate = 0,
-    after_warmup_lr_sched = linear_decay,
-    warmup_steps = warmup_steps
-)
 
-optimizer = tf.keras.optimizers.experimental.Adam(
-    learning_rate = warmup_schedule)
 
 metrics = [tf.keras.metrics.SparseCategoricalAccuracy('accuracy', dtype=tf.float32)]
 loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
 #glue_validation = glue['validation'].map(bert_inputs_processor).prefetch(1)
 #glue_test = glue['test'].map(bert_inputs_processor).prefetch(1)
-bert_classifier.compile(
-    optimizer=optimizer,
-    loss=loss,
-    metrics=metrics)
+
 
 #bert_classifier.evaluate(glue_validation)
 #glue_train_1 = glue_train
@@ -181,7 +150,6 @@ my_examples = {
 #result_cls_ids = tf.argmax(my_logits)
 
 #tf.gather(tf.constant(info.features['label'].names), result_cls_ids)
-export_model = ExportModel(bert_inputs_processor, bert_classifier)
 
 import tempfile
 
