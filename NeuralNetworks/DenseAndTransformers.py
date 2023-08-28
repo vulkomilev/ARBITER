@@ -13,9 +13,7 @@ import json
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('TkAgg')
+
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     try:
@@ -40,11 +38,6 @@ glue, info = tfds.load('glue/mrpc',
 
 bert_config_file = os.path.join(gs_folder_bert, "bert_config.json")
 config_dict = json.loads(tf.io.gfile.GFile(bert_config_file).read())
-
-
-bert_encoder = tfm.nlp.encoders.build_encoder(encoder_config)
-
-bert_classifier = tfm.nlp.models.BertClassifier(network=bert_encoder, num_classes=2)
 
 
 
