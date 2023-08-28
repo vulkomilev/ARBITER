@@ -260,7 +260,7 @@ class DenseAndTransformers(Agent):
                     y=np.asarray(y_train),
                    # validation_data=(glue_validation),
                     batch_size=32,
-                    epochs=epochs)
+                    epochs=10)
              self.loss_history +=loss.history['loss']
             #self.model.fit(x_train, y_train, batch_size=32, epochs=1)
             #self.model.save('./checkpoints/' + ckpt_name)
