@@ -1,16 +1,15 @@
-import copy
-
-import numpy as np
-
-from utils.utils import normalize_list, one_hot, DataUnit
-from utils.Agent import *
 import datetime
-#from  .Transformer import Transformer
-import tensorflow as tf
-import os
-import tensorflow_datasets as tfds
 import json
+import os
+
+# from  .Transformer import Transformer
+import tensorflow as tf
+import tensorflow_datasets as tfds
 import tensorflow_models as tfm
+
+from utils.Agent import *
+from utils.utils import normalize_list, one_hot, DataUnit
+
 nlp = tfm.nlp
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -47,35 +46,30 @@ encoder_config = tfm.nlp.encoders.EncoderConfig({
     'bert': config_dict
 })
 
-
 bert_encoder = tfm.nlp.encoders.build_encoder(encoder_config)
 
 bert_classifier = tfm.nlp.models.BertClassifier(network=bert_encoder, num_classes=2)
 
 
-
 class ExportModel(tf.Module):
-  def __init__(self, input_processor, classifier):
-    self.input_processor = input_processor
-    self.classifier = classifier
+    def __init__(self, input_processor, classifier):
+        self.input_processor = input_processor
+        self.classifier = classifier
 
-  @tf.function(input_signature=[{
-      'sentence1': tf.TensorSpec(shape=[None], dtype=tf.string),
-      'sentence2': tf.TensorSpec(shape=[None], dtype=tf.string)}])
-  def __call__(self, inputs):
-    packed = self.input_processor(inputs)
-    logits =  self.classifier(packed, training=False)
-    result_cls_ids = tf.argmax(logits)
-    return {
-        'logits': logits,
-        'class_id': result_cls_ids,
-        'class': tf.gather(
-            tf.constant(info.features['label'].names),
-            result_cls_ids)
-    }
-
-
-
+    @tf.function(input_signature=[{
+        'sentence1': tf.TensorSpec(shape=[None], dtype=tf.string),
+        'sentence2': tf.TensorSpec(shape=[None], dtype=tf.string)}])
+    def __call__(self, inputs):
+        packed = self.input_processor(inputs)
+        logits = self.classifier(packed, training=False)
+        result_cls_ids = tf.argmax(logits)
+        return {
+            'logits': logits,
+            'class_id': result_cls_ids,
+            'class': tf.gather(
+                tf.constant(info.features['label'].names),
+                result_cls_ids)
+        }
 
 
 class BertInputProcessor(tf.keras.layers.Layer):
@@ -87,10 +81,10 @@ class BertInputProcessor(tf.keras.layers.Layer):
     def call(self, inputs):
 
         tok1 = self.tokenizer(inputs['sentence1'])
-        #tok2 = self.tokenizer(inputs['sentence2'])
-        #tok3 = self.tokenizer(inputs['sentence3'])
+        # tok2 = self.tokenizer(inputs['sentence2'])
+        # tok3 = self.tokenizer(inputs['sentence3'])
 
-        packed = self.packer([tok1])#, tok2,tok3])
+        packed = self.packer([tok1])  # , tok2,tok3])
         if 'label' in inputs:
             return packed, inputs['label']
         elif 'label' in list(inputs.keys()):
@@ -98,11 +92,12 @@ class BertInputProcessor(tf.keras.layers.Layer):
         else:
             return packed
 
+
 max_seq_length = 128
 
 packer = tfm.nlp.layers.BertPackInputs(
     seq_length=max_seq_length,
-    special_tokens_dict = tokenizer.get_special_tokens_dict())
+    special_tokens_dict=tokenizer.get_special_tokens_dict())
 sentences1 = ["hello tensorflow"]
 tok1 = tokenizer(sentences1)
 
@@ -111,11 +106,11 @@ tok2 = tokenizer(sentences2)
 
 packed = packer([tok1, tok2])
 bert_inputs_processor = BertInputProcessor(tokenizer, packer)
-#glue_train = glue['train'].map(bert_inputs_processor).prefetch(1)
+# glue_train = glue['train'].map(bert_inputs_processor).prefetch(1)
 
-#example_inputs, example_labels = next(iter(glue_train))
-#bert_classifier(
- #   example_inputs, training=True).numpy()[:10]
+# example_inputs, example_labels = next(iter(glue_train))
+# bert_classifier(
+#   example_inputs, training=True).numpy()[:10]
 
 checkpoint = tf.train.Checkpoint(encoder=bert_encoder)
 checkpoint.read(
@@ -129,7 +124,7 @@ train_data_size = info.splits['train'].num_examples
 steps_per_epoch = int(train_data_size / batch_size)
 num_train_steps = steps_per_epoch * epochs
 warmup_steps = int(0.1 * num_train_steps)
-initial_learning_rate=2e-5
+initial_learning_rate = 2e-5
 
 linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
     initial_learning_rate=initial_learning_rate,
@@ -137,63 +132,64 @@ linear_decay = tf.keras.optimizers.schedules.PolynomialDecay(
     decay_steps=num_train_steps)
 
 warmup_schedule = tfm.optimization.lr_schedule.LinearWarmup(
-    warmup_learning_rate = 0,
-    after_warmup_lr_sched = linear_decay,
-    warmup_steps = warmup_steps
+    warmup_learning_rate=0,
+    after_warmup_lr_sched=linear_decay,
+    warmup_steps=warmup_steps
 )
 
 optimizer = tf.keras.optimizers.experimental.Adam(
-    learning_rate = warmup_schedule)
+    learning_rate=warmup_schedule)
 
 metrics = [tf.keras.metrics.SparseCategoricalAccuracy('accuracy', dtype=tf.float32)]
 loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
-#glue_validation = glue['validation'].map(bert_inputs_processor).prefetch(1)
-#glue_test = glue['test'].map(bert_inputs_processor).prefetch(1)
+# glue_validation = glue['validation'].map(bert_inputs_processor).prefetch(1)
+# glue_test = glue['test'].map(bert_inputs_processor).prefetch(1)
 bert_classifier.compile(
     optimizer=optimizer,
     loss=loss,
     metrics=metrics)
 
-#bert_classifier.evaluate(glue_validation)
-#glue_train_1 = glue_train
-#bert_classifier.fit(
+# bert_classifier.evaluate(glue_validation)
+# glue_train_1 = glue_train
+# bert_classifier.fit(
 #    glue_train,
 #    validation_data=(glue_validation),
 #    batch_size=32,
 #    epochs=epochs)
 my_examples = {
-        'sentence1':[
-            'The rain in Spain falls mainly on the plain.',
-            'Look I fine tuned BERT.'],
-        'sentence2':[
-            'It mostly rains on the flat lands of Spain.',
-            'Is it working? This does not match.']
-    }
-#ex_packed = bert_inputs_processor(my_examples)
-#my_logits = bert_classifier(ex_packed, training=False)
+    'sentence1': [
+        'The rain in Spain falls mainly on the plain.',
+        'Look I fine tuned BERT.'],
+    'sentence2': [
+        'It mostly rains on the flat lands of Spain.',
+        'Is it working? This does not match.']
+}
+# ex_packed = bert_inputs_processor(my_examples)
+# my_logits = bert_classifier(ex_packed, training=False)
 
-#result_cls_ids = tf.argmax(my_logits)
+# result_cls_ids = tf.argmax(my_logits)
 
-#tf.gather(tf.constant(info.features['label'].names), result_cls_ids)
+# tf.gather(tf.constant(info.features['label'].names), result_cls_ids)
 export_model = ExportModel(bert_inputs_processor, bert_classifier)
 
 import tempfile
 
 export_dir = tempfile.mkdtemp(suffix='_saved_model')
-#tf.saved_model.save(export_model, export_dir=export_dir,
+
+
+# tf.saved_model.save(export_model, export_dir=export_dir,
 #                    signatures={'serving_default': export_model.__call__})
 
-#original_logits = export_model(my_examples)['logits']
+# original_logits = export_model(my_examples)['logits']
 
-#reloaded = tf.saved_model.load(export_dir)
-#reloaded_logits = reloaded(my_examples)['logits']
-
+# reloaded = tf.saved_model.load(export_dir)
+# reloaded_logits = reloaded(my_examples)['logits']
 
 
 class DenseAndTransformersClassification(Agent):
 
-    def __init__(self,input_dict,output_dict):
+    def __init__(self, input_dict, output_dict):
         self.model = None
 
         self.total_tested = 0
@@ -202,13 +198,14 @@ class DenseAndTransformersClassification(Agent):
         self.reg_input = []
         self.reg_output = []
         for element in input_dict:
-         if element.is_id == False:
-             self.reg_input.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
+            if element.is_id == False:
+                self.reg_input.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
         for element in output_dict:
-         if element.is_id == False:
-             self.reg_output.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
+            if element.is_id == False:
+                self.reg_output.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
 
-        #self.init_neural_network()
+        # self.init_neural_network()
+
     def register(self, arbiter):
         arbiter.register_neural_network(self, self.reg_input, self.reg_output)
 
@@ -233,24 +230,24 @@ class DenseAndTransformersClassification(Agent):
         dff = 512
         num_heads = 2
         dropout_rate = 0.1
-        self.tokenizer = tf.keras.preprocessing.text.Tokenizer(['21','31'])
-        #print(len(token.num_words)
-        #exit(0)
+        self.tokenizer = tf.keras.preprocessing.text.Tokenizer(['21', '31'])
+        # print(len(token.num_words)
+        # exit(0)
 
-        input_model = tf.keras.Input(shape=(len(self.reg_input),1))#,dtype='int')
+        input_model = tf.keras.Input(shape=(len(self.reg_input), 1))  # ,dtype='int')
         self.vectorize_layer = tf.keras.layers.TextVectorization(
-           max_tokens=5000,
-           output_mode='int',
-           output_sequence_length=4)
+            max_tokens=5000,
+            output_mode='int',
+            output_sequence_length=4)
 
         model_mid = self.vectorize_layer(input_model)
         net = Transformer(num_layers, d_model, num_heads, dff, len(self.tokenizer.num_words),
                           len(self.tokenizer.num_words), pe_input=2048, pe_target=2048, rate=0.1)(input_model)
         model_mid = tf.keras.layers.Dense((len(self.reg_input)))(net)
-        model_mid = tf.keras.layers.Dense((len(self.reg_input)/2))(model_mid)
-        model_mid = tf.keras.layers.Dense((len(self.reg_input)/4))(model_mid)
-        model_mid = tf.keras.layers.Dense((len(self.reg_input)/8))(model_mid)
-        model_mid = tf.keras.layers.Dense((len(self.reg_output)),activation='softmax')(model_mid)
+        model_mid = tf.keras.layers.Dense((len(self.reg_input) / 2))(model_mid)
+        model_mid = tf.keras.layers.Dense((len(self.reg_input) / 4))(model_mid)
+        model_mid = tf.keras.layers.Dense((len(self.reg_input) / 8))(model_mid)
+        model_mid = tf.keras.layers.Dense((len(self.reg_output)), activation='softmax')(model_mid)
         self.model = tf.keras.Model(inputs=input_model, outputs=model_mid)
 
         self.model.compile(optimizer="adam", loss=tf.keras.losses.MeanSquaredError(), run_eagerly=True)
@@ -292,7 +289,7 @@ class DenseAndTransformersClassification(Agent):
                     elif element_key.type == 'float' and element_key.is_id == False:
                         return_dict[element_key.name] = normalize_list(local_data, max(local_data), min(local_data),
                                                                        1.0, -1.0)
-                    #elif element_key.is_id == False:
+                    # elif element_key.is_id == False:
                     #    exit(0)
 
         return return_dict
@@ -313,43 +310,41 @@ class DenseAndTransformersClassification(Agent):
                         local_list.append('')
 
                     if type(local_element) == type([]):
-                          local_list.append(element.source.get_by_name(second_element.name)[0])
+                        local_list.append(element.source.get_by_name(second_element.name)[0])
                     else:
-                            local_list.append(element.source.get_by_name(second_element.name))
+                        local_list.append(element.source.get_by_name(second_element.name))
             local_data_input.append(local_list)
 
-
         for element in data:
-           local_list = []
-           for second_element in self.reg_output:
+            local_list = []
+            for second_element in self.reg_output:
                 if len(second_element.name) > 0:
                     local_element = element.target.get_by_name(second_element.name)
                     if local_element == None:
                         local_element = 0
                     local_list.append(local_element)
-           local_data_output.append(local_list)
+            local_data_output.append(local_list)
         normalized_data_input = []
         normalized_data_output = []
-        for x,y in zip(local_data_input,local_data_output):
+        for x, y in zip(local_data_input, local_data_output):
+            local_data = bert_inputs_processor({'sentence1': tf.convert_to_tensor([x[1]], dtype=tf.string),
 
-           local_data = bert_inputs_processor({'sentence1': tf.convert_to_tensor([x[1]], dtype=tf.string),
-
-                                            'label': np.array([1])})#y[0]
-           #print(int(y[0]))
-           #exit(0)
-           normalized_data_input.append(local_data[0])
-           normalized_data_output.append(local_data[1])
+                                                'label': np.array([1])})  # y[0]
+            # print(int(y[0]))
+            # exit(0)
+            normalized_data_input.append(local_data[0])
+            normalized_data_output.append(local_data[1])
         #    local_data_output.append(local_list)
-        #local_data_input = np.array(local_data_input)
-        #local_data_input_str = local_data_input_str#np.array(local_data_input)#.tolist()
-        #normalized_data_input = np.array(self.unlist(normalized_data_input))
-        #normalized_data_output = np.array(self.unlist(normalized_data_output))
-        norm_arr_x = normalized_data_input#np.array(normalized_data_input).tolist()
+        # local_data_input = np.array(local_data_input)
+        # local_data_input_str = local_data_input_str#np.array(local_data_input)#.tolist()
+        # normalized_data_input = np.array(self.unlist(normalized_data_input))
+        # normalized_data_output = np.array(self.unlist(normalized_data_output))
+        norm_arr_x = normalized_data_input  # np.array(normalized_data_input).tolist()
         norm_arr_y = normalized_data_output
 
         return norm_arr_x, norm_arr_y
 
-    def train(self, images, force_train=False,only_fill=False):
+    def train(self, images, force_train=False, only_fill=False):
         if images != None:
             self.local_bucket.append(images)
         if len(self.local_bucket) < 100:
@@ -367,18 +362,17 @@ class DenseAndTransformersClassification(Agent):
             self.model = tf.keras.models.load_model('./checkpoints/' + ckpt_name)
         else:
 
-            #self.vectorize_layer.adapt(x_train[0])
+            # self.vectorize_layer.adapt(x_train[0])
 
-            for x,y in zip(x_train,y_train):
-
+            for x, y in zip(x_train, y_train):
                 bert_classifier.fit(
                     x=x,
                     y=y,
-                   # validation_data=(glue_validation),
+                    # validation_data=(glue_validation),
                     batch_size=32,
                     epochs=epochs)
-            #self.model.fit(x_train, y_train, batch_size=32, epochs=1)
-            #self.model.save('./checkpoints/' + ckpt_name)
+            # self.model.fit(x_train, y_train, batch_size=32, epochs=1)
+            # self.model.save('./checkpoints/' + ckpt_name)
         self.local_bucket = []
 
     def save(self):
@@ -387,7 +381,7 @@ class DenseAndTransformersClassification(Agent):
     def predict(self, image):
         print("predict")
         x_train, y_train = self.prepare_data([image], in_train=True)
-        #print(x_train)
+        # print(x_train)
         _ = self.model.predict(x_train)
-        #print(_)
-        return abs(_[0])
+        # print(_)
+        return _

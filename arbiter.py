@@ -14,6 +14,7 @@ from NeuralNetworks.CellularAutomataAndData import CellularAutomataAndData
 #from NeuralNetworks.ImageAutoencoderDiscreteFunctions import ImageAutoencoderDiscreteFunctions
 from NeuralNetworks.ImageAndData import ImageAndData
 from NeuralNetworks.DenseAndTransformers import  DenseAndTransformers
+from  NeuralNetworks.HistogramDense import HistogramDense
 
 
 class Arbiter(object):
@@ -31,6 +32,7 @@ class Arbiter(object):
         self.init_neural_network()
         self.skip_arbiter = skip_arbiter
         self.return_ids = []
+        self.submited_ids = []
         self.arbiter_router = {
             "": []
         }
@@ -169,9 +171,8 @@ class Arbiter(object):
             layer_size = len(input_list)
             self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
                 self.arbiter_neural_network_input)
-            layer_size = len(input_list) #/ len(list( self.registered_networks.keys()))
 
-            self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
+            self.arbiter_neural_network = tf.keras.layers.Dense(int(output_len))( \
                     self.arbiter_neural_network)
 
         self.arbiter_neural_model = tf.keras.Model(inputs=self.arbiter_neural_network_input,
@@ -384,15 +385,30 @@ class Arbiter(object):
             self.registered_networks[element]['neural_network'].train(None, force_train=force_train,
                                                                       only_fill=False)
         if train_arbiter and not self.skip_arbiter:
-            local_y = []
-            local_x = []
-            for key in list(self.bundle_bucket.keys()):
+                local_y = []
+                local_x = []
                 local_predictions = {}
                 local_predictions_index = []
-                x_element = []
+                local_bundle_list = {}
+                local_return_results = {}
                 for element in self.registered_networks.keys():
-                    local_predictions[element] = self.registered_networks[element]['neural_network'].predict(self.bundle_bucket[key])
+                  local_bundle_list[element] = []
+                for key in list(self.bundle_bucket.keys()):
 
+                    x_element = []
+                    local_y.append(get_data_by_list(self.bundle_bucket[key].target,
+                                                    self.registered_networks[list(self.registered_networks.keys())[0]]['output_path']))
+                    for element in self.registered_networks.keys():
+                        local_bundle_list[element].append(DataBundle('000000', source=get_data_by_list(self.bundle_bucket[key].source,
+                                                                                    self.registered_networks[element][
+                                                                                        'input_path']),
+                                                  target=get_data_by_list(self.bundle_bucket[key].target,
+                                                                          self.registered_networks[element]['output_path'])))
+
+
+                for element in self.registered_networks.keys():
+                     local_predictions[element] = self.registered_networks[element]['neural_network'].predict(local_bundle_list[element])
+                     local_return_results[element] = {}
                 for element in self.registered_networks.keys():
                     local_predictions_index.append(local_predictions[element])
 
@@ -405,8 +421,7 @@ class Arbiter(object):
                     x_element.append(local_result)
                 local_x.append(x_element)
 
-                local_y.append(self.bundle_bucket[key].target)
-            self.train_arbiter(local_x, local_y)
+                self.train_arbiter(local_x, local_y)
 
     def train_arbiter(self, agent_results, target):
         x_fit = []
@@ -416,66 +431,84 @@ class Arbiter(object):
             class_num = 100
         elif self.tagrte_type == REGRESSION:
             class_num = 1
-        for agent_result, y in zip(agent_results, target):
+        for agent_result in agent_results:
             local_arr_x = []
+
             if type(agent_result) != list:
                 x_fit.append(np.array(0))
             else:
-                if self.tagrte_type == REGRESSION_CATEGORY:
-                    local_arr_x += agent_result
-                elif self.tagrte_type == REGRESSION:
-                    local_arr_x += agent_result
+                local_arr_x += agent_result
                 x_fit.append(local_arr_x)
-            if self.tagrte_type == REGRESSION_CATEGORY:
-                local_target = [0] * 100
-                local_target[y - 1] = 1
-                y_fit.append(local_target)
-            elif self.tagrte_type == REGRESSION:
-
-                y_fit.append(y / 100.0)
-            else:
-                y_fit.append(tf.one_hot(y, class_num))
-        x_fit = np.array(x_fit)
+        for y in target:
+            local_arr_y = []
+            for element in y.data_schema:
+                if not element.is_id :
+                    local_arr_y.append(y.get_by_name(element.name))
+            y_fit.append(local_arr_y)
+        x_fit = np.concatenate( np.array(local_arr_x),axis=1)
         y_fit = np.array(y_fit)
 
-        model_ = self.arbiter_neural_model.fit(x_fit, y_fit, epochs=200)
+        self.arbiter_neural_model.fit(x_fit, y_fit, epochs=10)
 
-    def predict(self, image):
+    def predict(self):
         local_agents = []
         local_predictions = {}
+        local_return_results = {}
         local_predictions_index = []
+
+        local_bundle_list = {}
+        for element in self.registered_networks.keys():
+            local_bundle_list[element] = []
         for element in dir(self):
             if 'agent_' in element:
                 local_agents.append(element)
         for key in list(self.bundle_bucket.keys()):
-            for element in self.registered_networks.keys():
-                 local_bundle = DataBundle('000000', source=get_data_by_list(self.bundle_bucket[key].source,
+                for element in self.registered_networks.keys():
+                 local_bundle_list[element].append(DataBundle('000000', source=get_data_by_list(self.bundle_bucket[key].source,
                                                                              self.registered_networks[element][
                                                                                  'input_path']),
                                            target=get_data_by_list(self.bundle_bucket[key].target,
-                                                                   self.registered_networks[element]['output_path']))
-                 local_predictions[element] = self.registered_networks[element]['neural_network'].predict(local_bundle)
-
+                                                                   self.registered_networks[element]['output_path'])))
         for element in self.registered_networks.keys():
-            local_predictions_index.append(local_predictions[element])
-        local_arr_x = []
-        local_x = []
+            local_predictions[element] = self.registered_networks[element]['neural_network'].predict(local_bundle_list[element])
+            local_return_results[element] = {}
+        for element in self.registered_networks.keys():
+            for key ,val in zip(list(self.bundle_bucket.keys()),local_predictions[element] ):
+                local_return_results[element][key] =val
+
+        agent_results = []
+
         for key in local_predictions.keys():
-            local_x.append(local_predictions[key])
-        for x in local_x:
-            if x is None:
-                local_arr_x += [0]*int(len(self.input_arbiter_len)/len(list( self.registered_networks.keys())))
+            local_result = local_predictions[key]
+            if local_result is None:
+                local_result = 0
             else:
-                if type(x) == type(np.zeros(1)):
-                    x = x.tolist()
-                local_arr_x += x
+                local_result = local_result
+            agent_results.append(local_result)
+
+        x_fit = []
+        for agent_result in agent_results:
+            local_arr_x = []
+
+            if type(agent_result) != list:
+                x_fit.append(agent_result)
+            else:
+                local_arr_x += agent_result
+                x_fit.append(local_arr_x)
 
         if self.skip_arbiter:
-            return np.array([local_arr_x]), None
-        local_arr_x = np.squeeze(local_arr_x)
-        result = self.arbiter_neural_model.predict(np.array([local_arr_x]))
-
-        return result, local_predictions
+            return local_predictions, None
+        template_shape = x_fit[0].shape
+        x_fit_filtered = []
+        for i in range(len(x_fit)):
+            if np.array(x_fit[i]).shape == template_shape:
+                x_fit_filtered.append(x_fit[i])
+        x_fit_filtered = np.concatenate(np.array(x_fit_filtered), axis=1)
+        result = self.arbiter_neural_model.predict(x_fit_filtered)
+        retur_dict = {}
+        for i in range(len(result)):
+            retur_dict[list(self.bundle_bucket.keys())[i]] = result[i]
+        return retur_dict, local_predictions
 
     def evaluate(self, images):
         correct_count = 0
@@ -552,7 +585,7 @@ class Arbiter(object):
 
     def submit(self, file_dest=''):
 
-        f = open(file_dest + 'submission.csv', 'w+')
+        f = open(file_dest + 'submission.csv', 'a+')
         writer = csv.writer(f)
         local_arr = []
         local_dict ={}
@@ -575,40 +608,50 @@ class Arbiter(object):
         for element in local_arr:
             local_dict[element] = []
         writer.writerow(local_arr)
-        for key in list(self.bundle_bucket.keys()):
+        results, _ = self.predict()
+        results = np.squeeze(results)
 
-            results, _ = self.predict(self.bundle_bucket[key])
-            results = np.squeeze(results)
-            #print('self.target_min',self.target_min)
-            #print('self.target_max', self.target_max)
-            #exit(0)
-            #results = self.denormalize(results)
-            if type(results) == type(np.zeros((2))):
+        #results = self.denormalize(results)
+        if type(results) == type(np.zeros((2))):
                 results = results.tolist()
+
+
+        #if type(results) == type({}):
+        #    results = results[list(results.keys())[0]]
+        for key in list(results.keys()):
+            print(key)
             local_arr = []
             final_ids = []
             try:
-                local_id_dict = copy.deepcopy(output_id_dict)
-                self.get_data_ids(self.bundle_bucket[key].source,local_id_dict)
-                for element in local_ids:
-                        final_ids.append(str(local_id_dict[element]))
-                local_arr.append('_'.join(final_ids).replace('.csv',''))
+                    local_id_dict = copy.deepcopy(output_id_dict)
+                    self.get_data_ids(self.bundle_bucket[key].source,local_id_dict)
+                    for element in local_ids:
+                            final_ids.append(str(local_id_dict[element]))
+                    local_arr.append('_'.join(final_ids).replace('.csv',''))
             except IOError as e:
-                print(e)
-                exit(0)
+                    print(e)
+                    exit(0)
             if type(results) ==  type([]):
-              for element in results:
+                for element in results[key]:
 
-                local_arr.append(round(element,4))
+                    local_arr.append(round(element,4))
 
 
             else:
-                local_arr.append(round(results,4))
+                  for element in results[key]:
+                    if type(element) == type(np.array([0])):
+                        element = element.tolist()
+                    if type(element) == list:
+                        local_arr += element
+                    else:
+                        local_arr.append(element)
             for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
-                if element == 'Turn':
-                    arr_element = int(arr_element)
+                    if element == 'Turn':
+                        arr_element = int(arr_element)
 
 
-                #local_dict[element].append(arr_element)
-            writer.writerow(local_arr)
+                    #local_dict[element].append(arr_element)
+            if str(key) not in self.submited_ids:
+                    writer.writerow(local_arr)
+            self.submited_ids.append(str(key))
 

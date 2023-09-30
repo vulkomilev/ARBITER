@@ -1,3 +1,4 @@
+import copy
 import importlib
 
 from arbiter import Arbiter
@@ -586,7 +587,7 @@ data_schema_output = {'summaries_train':[
     DataUnit('float', (), None, 'wording', )]}
 
 # tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
-agent_router = [{'DenseAndTransformers':None}]
+agent_router = [{'DenseAndTransformers':None},{'HistogramDense':None}]
 
 
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
@@ -614,7 +615,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
     arbiter = Arbiter(data_schema_input=data_schema_input,
                       data_schema_output=data_schema_output, target_type=target_type,
                       class_num=image_collection_train['num_classes'],
-                      router_agent=agent_router, skip_arbiter=True)
+                      router_agent=agent_router, skip_arbiter=False)
     # print(type(image_collection_train['image_arr']))
     # print(image_collection_train['image_arr'][0])
     # exit(0)
@@ -627,9 +628,9 @@ def runner(dataset_path, train_name='train', restrict=True, \
 
     # print(image_collection_train)
    # arbiter.normalize_bundle_bucket()
-    for i in range(10):
+    for i in range(1):
         print('-------')
-        arbiter.train(force_train=True, train_arbiter=False)
+        arbiter.train(force_train=True, train_arbiter=True)
     arbiter.save()
     arbiter.empty_bucket()
     data_schema_input_test = {"summaries_test":
@@ -657,6 +658,6 @@ def runner(dataset_path, train_name='train', restrict=True, \
             arbiter.add_bundle_bucket(i, element)
     else:
         for key in list(image_collection_train['image_arr'].keys()):
-            arbiter.add_bundle_bucket(key, image_collection_train['image_arr'][key])
+            arbiter.add_bundle_bucket(key, copy.deepcopy( image_collection_train['image_arr'][key]))
     #arbiter.normalize_bundle_bucket(is_submit=True)
     arbiter.submit('/kaggle/working/')

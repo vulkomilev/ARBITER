@@ -65,6 +65,12 @@ class DataCollection(object):
                 return element.data
         return None
 
+    def get_by_type(self, name):
+        for element in self.data_collection:
+            if element.type == name:
+                return element.data
+        return None
+
     def set_by_name(self, name, val):
         for i, element in enumerate(self.data_collection):
             if element.name == name:
