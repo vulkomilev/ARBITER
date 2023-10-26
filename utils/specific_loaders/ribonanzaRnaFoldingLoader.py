@@ -599,8 +599,8 @@ def specific_submit(self, file_dest=''):
             local_dict[element] = []
         writer.writerow(["id","reactivity_DMS_MaP","reactivity_2A3_MaP"])
         local_id_list = {}
-        for key in list(self.bundle_bucket.keys()):
-                 local_id_list[key] = self.bundle_bucket[key].source['train_data'].get_by_name('experiment_type')
+        #for key in list(self.bundle_bucket.keys()):
+        #         local_id_list[key] = self.bundle_bucket[key].source['train_data'].get_by_name('experiment_type')
 
         results, _ = self.predict()
         results = np.squeeze(results)
@@ -612,35 +612,38 @@ def specific_submit(self, file_dest=''):
 
         #if type(results) == type({}):
         #    results = results[list(results.keys())[0]]
+        seq_id = 0
         for key in list(results.keys()):
             print(key)
             local_arr = []
             final_ids = []
-            if local_id_list[key] == '2A3_MaP':
-                is_2A3 = True
-            elif local_id_list[key] == 'DMS_MaP':
-                is_dsm = True
+            is_2A3 = True
+            #if local_id_list[key] == '2A3_MaP':
+            #    is_2A3 = True
+            #elif local_id_list[key] == 'DMS_MaP':
+            #    is_dsm = True
             try:
                     local_id_dict = copy.deepcopy(output_id_dict)
                     self.get_data_ids(self.bundle_bucket[key].source,local_id_dict)
                     for element in local_ids:
                             final_ids.append(str(local_id_dict[element]))
-                    local_arr.append('_'.join(final_ids).replace('.csv',''))
+                    local_arr.append(seq_id)
+                    seq_id += 1
             except IOError as e:
                     print(e)
                     exit(0)
             if type(results) ==  type([]):
                 for element in results[key]:
 
-                    local_arr.append(round(element,4))
+                    local_arr.append(round(element,3))
 
 
             else:
                        if is_dsm:
                            local_arr.append(0)
-                           local_arr.append(numpy.mean(results[key][0]))
+                           local_arr.append(round(numpy.mean(results[key][0]),3))
                        elif is_2A3:
-                           local_arr.append(numpy.mean(results[key][0]))
+                           local_arr.append(round(numpy.mean(results[key][0]),3))
                            local_arr.append(0)
 
             for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):

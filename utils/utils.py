@@ -175,7 +175,7 @@ class DataUnit(object):
             if type_val == 'str':
                 data = str(data)
             elif type_val == 'int':
-                if np.isnan(data).any():
+                if pd.isnull(data):
                     data = np.nan
                 else:
                     data = np.array(data, dtype=np.int64)

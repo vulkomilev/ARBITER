@@ -643,22 +643,15 @@ def runner(dataset_path, train_name='train', restrict=True, \
         arbiter.train(force_train=True, train_arbiter=True)
     arbiter.save()
     arbiter.empty_bucket()
-    data_schema_input_test = {"train_data":
+    data_schema_input_test = {"test_sequences":
                              [DataUnit('str', (), None, 'sequence_id', is_id=True),
                               DataUnit('str', (), None, 'sequence'),
-                              DataUnit('str', (), None, 'experiment_type', ),
-                              DataUnit('str', (), None, 'dataset_name', ),
-                              DataUnit('int', (), None, 'reads', ),
-                              DataUnit('float', (), None, 'signal_to_noise', ),
-                              DataUnit('bool', (), None, 'SN_filter', ), ],
+                              DataUnit('int', (), None, 'id_min', ),
+                              DataUnit('int', (), None, 'id_max', ),
+                              DataUnit('bool', (), None, 'future', ),]
                          }
-
-    data_schema_output_test = {'train_data': [
-        DataUnit('str', (), None, 'sequence_id', is_id=True),
-
-        DataUnit('arr', (500), None, 'reactivity', ),
-        DataUnit('arr', (500), None, 'reactivity_error', )]}
-    #arbiter.remap_registered_networks("summaries_test","summaries_test")
+    data_schema_output_test = {'test_sequences': []}
+    arbiter.remap_registered_networks("test_sequences","test_sequences")
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name=submit_file, restrict=restrict, \
                                                                  size=size, target_name='letter', no_ids=False,
@@ -676,3 +669,4 @@ def runner(dataset_path, train_name='train', restrict=True, \
             arbiter.add_bundle_bucket(key, copy.deepcopy( image_collection_train['image_arr'][key]))
     #arbiter.normalize_bundle_bucket(is_submit=True)
     arbiter.submit('/kaggle/working/')
+
