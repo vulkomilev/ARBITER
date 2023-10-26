@@ -40,11 +40,11 @@ class HistogramDense(Agent):
         self.reg_output = []
         for element in input_dict:
          if element.is_id == False:
-             self.reg_input.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
+             self.reg_input.append(DataUnit(str(element.type), element.shape, None, '', is_id=element.is_id))
         for element in output_dict:
          print('element',element)
          if element.is_id == False:
-             self.reg_output.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
+             self.reg_output.append(DataUnit(str(element.type), element.shape, None, '', is_id=element.is_id))
 
         self.init_neural_network()
     def register(self, arbiter):
@@ -145,7 +145,8 @@ class HistogramDense(Agent):
                         local_list.append(local_element)
             adapt_list+=local_list
             local_data_input.append(local_list)
-        self.vectorize_layer.adapt(adapt_list)
+        if len(adapt_list) > 0:
+         self.vectorize_layer.adapt(adapt_list)
         local_data_output = []
         for element in data:
             local_list = []
@@ -194,7 +195,9 @@ class HistogramDense(Agent):
 
     def predict(self, image):
         x_train, y_train = self.prepare_data(image, in_train=True)
-
+        return None
+        if len(x_train) == 0:
+            return None
         _ = self.model.predict(x_train)
 
         return np.squeeze(np.array(_)).tolist()

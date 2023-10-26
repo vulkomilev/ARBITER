@@ -12,325 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib import image
-
-IMAGE_WIDTH = 256
-IMAGE_HEIGHT = 256
-THREAD_COUNT = 32
-loaded_ids = []
-loaded_ids_target = []
-index_csv = {}
-
-IMAGE_EXTS_LIST = ['jpg', 'png']
-DATA_FORMATS_SPECIAL = ['2D_F', '2D_INT','arr']
-DATA_FORMATS = ['float', 'int', 'str', 'date', 'bool'] + DATA_FORMATS_SPECIAL
-REGRESSION_CATEGORY = 'int'
-REGRESSION = 'float'
-CATEGORY = 'Category'
-STRING = 'str'
-TIME_SERIES = 'TimeSeries'
-IMAGE = '2D_F'
-TARGET_TYPES = [REGRESSION, REGRESSION_CATEGORY, CATEGORY, TIME_SERIES, IMAGE]
-HEURISTICS = {}
-local_lib = {}
-
-GLOBAL_DATA = {}
-GLOBAL_ID_DATA = {}
-
-
-class DataCollection(object):
-
-    def __init__(self, data_size, data_schema, data):
-        self.data_size = data_size
-        self.data_collection = []
-        self.data_schema = data_schema
-        self.add_data(data)
-        for element in data_schema:
-            if element.type not in DATA_FORMATS:
-                raise RuntimeError('Data type in schema is not supported')
-
-    def get_names(self):
-        return_list = []
-        for element in self.data_collection:
-            return_list.append(element.name)
-        return return_list
-
-    def get_shape_by_name(self, name):
-        for element in self.data_collection:
-            if element.name == name:
-                return element.shape
-
-    def get_by_name(self, name):
-        for element in self.data_collection:
-            if element.name == name:
-                return element.data
-        return None
-
-    def get_by_type(self, name):
-        for element in self.data_collection:
-            if element.type == name:
-                return element.data
-        return None
-
-    def set_by_name(self, name, val):
-        for i, element in enumerate(self.data_collection):
-            if element.name == name:
-                self.data_collection[i].data = copy.deepcopy(val)
-                return
-
-    def set_by_dict(self, input_dict,index=-1):
-        for i, element in enumerate(self.data_collection):
-            if element.name in list(input_dict.keys()):
-               if index != -1:
-                   self.data_collection[i].data = copy.deepcopy(input_dict[element.name][index])
-               else:
-                self.data_collection[i].data = copy.deepcopy(input_dict[element.name])
-
-    def get_dict(self, include_only_id=False):
-
-        return_dict = {}
-
-        for element in self.data_collection:
-            if not include_only_id:
-                if not element.is_id:
-                    return_dict[element.name] = element.data
-            else:
-                if element.is_id:
-                    return_dict[element.name] = element.data
-        return return_dict
-
-    def add_data(self, data):
-        if type(data) == dict:
-            data_element_collection = []
-            added_elements = []
-            for schema_element, element in zip(self.data_schema, data):
-                data_unit = DataUnit(type_val=schema_element.type, is_id=schema_element.is_id,
-                                     shape=schema_element.shape, name=schema_element.name,
-                                     data=data[schema_element.name])
-                added_elements.append(schema_element.name)
-                data_element_collection.append(data_unit)
-                self.data_collection = data_element_collection
-        else:
-            if len(data) == 0:
-                return
-
-            data_element_collection = []
-            added_elements = []
-            for schema_element, element in zip(self.data_schema, data):
-                data_unit = DataUnit(type_val=schema_element.type, is_id=schema_element.is_id,
-                                     shape=schema_element.shape, name=schema_element.name,
-                                     data=element)
-                added_elements.append(schema_element.name)
-                data_element_collection.append(data_unit)
-
-            self.data_collection = data_element_collection
-
-    def remove(self, name):
-
-        for element in self.data_collection:
-            if element.name == name:
-                self.remove(element)
-
-
-def try_convert_float(f):
-    try:
-        return float(f)
-    except Exception as e:
-        return 0.0
-
-
-class DataInd(object):
-    def __init__(self, timestamp, cat_subcat, model_sign):
-        self.timestamp = timestamp
-        self.cat_subcat = cat_subcat
-        self.model_sign = model_sign
-
-
-class DataBundle(object):
-    def __init__(self, data_ind, source, target):
-        self.source = source
-        self.target = target
-        self.data_ind = data_ind
-
-
-class ModelIOReg(object):
-    def __init__(self, data_list):
-        self.data_list = data_list
-
-
-class DataUnit(object):
-
-    def __init__(self, type_val, shape, data, name='',load_name=None, is_id=False, break_seq=False, break_size=100,is_file_name=False):
-        self.is_id = is_id
-        self.is_file_name = is_file_name
-
-        if type_val not in DATA_FORMATS:
-            raise RuntimeError('Data type in data provided is not supported')
-        if data is not None:
-            if np.array(data).shape != shape and shape != () and \
-                    np.array([data]).shape != shape  and type_val != 'arr':
-                raise RuntimeError('Data shape is different form the schema', np.array([data]).shape, shape)
-
-        if type(data) != type(None):
-
-            if type_val == 'str':
-                data = str(data)
-            elif type_val == 'int':
-                if np.isnan(data).any():
-                    data = np.nan
-                else:
-                    data = np.array(data, dtype=np.int64)
-
-            elif type_val == 'float':
-                if np.isnan(data):
-                    data = np.nan
-                else:
-                    data = np.array(data, dtype=np.float64)
-
-            elif type_val == 'arr':
-                local_arr = [0]*shape
-                for i in range(len(data)):
-                    if data[i] == np.nan or math.isnan(data[i] ):
-                        local_arr[i] = 0
-                    else:
-                     local_arr[i] = data[i]
-                data = local_arr
-
-        self.load_name = load_name
-        self.type = type_val
-        self.shape = shape
-        self.data = data
-        self.name = name
-        self.break_seq = break_seq
-        self.break_size = break_size
-
-
-def one_hot(string_list, element_key):
-    unique_indentifier = list(set(string_list))
-    if len(unique_indentifier) > 250 and element_key.break_seq == False:
-        return []
-    if element_key.break_seq:
-        return_arr = []
-        local_alphabet = []
-        for arr in string_list:
-            for element in arr:
-                if element not in local_alphabet:
-                    local_alphabet.append(element)
-        unique_indentifier = list(set(local_alphabet))
-        for arr in string_list:
-            local_arr = []
-            for element_pos in range(len(arr)):
-                if element_pos % element_key.break_size == 0:
-                    local_arr.append([])
-                local_entry = [0] * len(unique_indentifier)
-                local_entry[unique_indentifier.index(arr[element_pos])] = 1
-                local_arr[-1].append(local_entry)
-            for i in range(element_key.break_size - len(local_arr[-1])):
-                local_arr[-1].append([0] * len(unique_indentifier))
-            return_arr.append(local_arr)
-        return return_arr
-
-    else:
-        unique_str = len(unique_indentifier)
-        one_hot_list = []
-        for element in string_list:
-            local_entry = [0] * unique_str
-            local_entry[unique_indentifier.index(element)] = 1
-            one_hot_list.append(local_entry)
-        return one_hot_list
-
-
-def contur_image(img):
-    grey_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur_img = cv2.blur(grey_img, (3, 3), 0)
-    contur_img = cv2.Sobel(src=blur_img, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=5)
-    return contur_img
-
-
-def find_image_by_name(img_name, path):
-    global local_lib
-    local_path = ''
-    img_name = str(img_name)
-    img_name = img_name.replace('^', '')
-
-    if len(local_lib.keys()) == 0:
-        for root, dirs, files in os.walk(path):
-            for element in files:
-                if element[:-4] not in list(local_lib.keys()):
-                    local_lib[element[:-4]] = os.path.join(root, element)
-    if img_name in list(local_lib.keys()):
-
-        if len(local_lib[img_name]) > 0:
-            ds = image.imread(local_lib[img_name])[:, :, :3]
-
-            pixel_array_numpy = ds
- 
-            return pixel_array_numpy
-
-    if len(local_path) > 0:
-        ds = image.imread(local_path)
-        pixel_array_numpy = ds
-        return pixel_array_numpy
-
-
-def is_int(i):
-    try:
-        int(i)
-        return True
-    except Exception as e:
-        return False
-
-
-def is_float(i):
-    try:
-        float(i)
-        return True
-    except Exception as e:
-        return False
-
-
-def is_float_arr(i):
-    try:
-        for element in i:
-            float(element)
-        return True
-    except Exception as e:
-        return False
-
-
-def normalize_list(local_list, max_val, min_val, target_max, target_min, type_in=None):
-    if type_in == 'bool':
-        for i in range(len(local_list)):
-            local_list[i] = int(local_list[i])
-            return local_list
-    if (abs(min_val) + abs(max_val)) == 0:
-        return local_list
-    if len(local_list) == 0:
-        return local_list
-    if type(local_list[0]) == type([]):
-        return local_list
-    for i in range(len(local_list)):
-
-        local_list[i] = ((local_list[i] + abs(min_val)) / ((abs(min_val) + abs(max_val)))) - abs(target_min) * 1
-        if math.isnan(local_list[i]):
-            local_list[i] = 0
-    return local_list
-
-
-def normalize_image(image):
-    return image
-
-
-def flatten_list(xs):
-    for x in xs:
-        if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
-            yield from flatten_list(x)
-        else:
-            yield x
-
-
-def re_size_image(img):
-    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
-    return img
+from ..utils import DataUnit,DataBundle,DataCollection,DATA_FORMATS_SPECIAL,find_image_by_name,DataInd,IMAGE_EXTS_LIST
 
 
 # is this thread save
@@ -435,48 +117,8 @@ def split_list(target_list, count, restrict=False, size=1000):
     return splited_list
 
 
-def split_dict(target_dict, count, restrict=False, size=1000):
-    interval = int(len(target_dict[list(target_dict.keys())[0]]) / count)
-    splited_dict = {}
-    for local_key in target_dict.keys():
-        splited_dict[local_key] = []
-    for local_key in splited_dict.keys():
-        for i in range(count):
-            splited_dict[local_key].append(target_dict[local_key][i * interval:(i + 1) * interval])
-    for local_key in splited_dict.keys():
-        splited_list_rest = splited_dict[local_key][(count + 1) * interval:]
-        for i, element in enumerate(splited_list_rest):
-            splited_dict[local_key][i].append(element)
-
-    if restrict:
-        for local_key in splited_dict.keys():
-            for i in range(len(splited_dict[local_key])):
-                random_start = random.randint(0, len(splited_dict[local_key][i]) - (size + 1))
-                splited_dict[local_key][i] = splited_dict[local_key][i][random_start:random_start + size]
-
-    return splited_dict
 
 
-def image_loader_json_images(path, restrict=False, size=1000):
-    image_paths = image_list(path)
-    image_ids = None
-
-    local_image_collection = {'num_classes': 0, 'image_arr': []}
-    if size < len(image_paths):
-        image_paths_list = split_list(image_paths, THREAD_COUNT, restrict, size)
-    else:
-        image_paths_list = []
-        for element in image_paths:
-            image_paths_list.append([element])
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
-
-        futures = [executor.submit(image_json_loader_worker, args) for args in
-                   zip(image_paths_list)]
-        print("THREAD COUNT:", len(futures))
-        results = [f.result() for f in futures]
-
-    return results
 
 
 def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=False,
@@ -492,15 +134,7 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
     GLOBAL_ID_DATA = {}
     image_paths = image_list(path + 'train_images/')
     image_ids = None
-    if Path(path + train_name + '.csv').exists():
-        if not dir_tree:
-            image_ids, loaded_ids_size = load_id_from_csv(path + train_name + '.csv', data_schema_input,
-                                                          data_schema_output, restrict, size, path)
-        else:
-            image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input, data_schema_output,
-                                                                   restrict, size)
-    elif dir_tree:
-        image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input, data_schema_output, restrict,
+    image_ids, loaded_ids_size = load_id_from_dir_tree_csv(path, data_schema_input, data_schema_output, restrict,
                                                                size)
     print('csv load done')
     local_image_collection = {'num_classes': 0, 'image_arr': []}
@@ -517,7 +151,7 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
         train_cutoff = int(split_coef * len(local_image_collection['image_arr']))
         if not load_image:
             key_list = list(image_ids.keys())
-            #random.shuffle(key_list)
+            # random.shuffle(key_list)
             train_cutoff = int(split_coef * len(key_list))
             for i in range(0, train_cutoff):
                 train_arr[key_list[i]] = image_ids[key_list[i]]
@@ -541,14 +175,14 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
         if not load_image:
             if type(image_ids) == type({}):
                 key_list = list(image_ids.keys())
-                #random.shuffle(key_list)
+                # random.shuffle(key_list)
                 train_cutoff = int(len(key_list))
                 for i in range(0, train_cutoff):
                     train_arr[key_list[i]] = (image_ids[key_list[i]])
                 return {'num_classes': local_image_collection['num_classes'], 'image_arr': train_arr}, {
                     'num_classes': local_image_collection['num_classes'], 'image_arr': []}
             elif type(image_ids) == type([]):
-                #random.shuffle(image_ids)
+                # random.shuffle(image_ids)
                 train_cutoff = int(len(image_ids))
                 for i in range(0, train_cutoff):
                     train_arr[i] = (image_ids[i])
@@ -556,7 +190,7 @@ def image_loader(path, train_name='train', restrict=False, size=1000, no_ids=Fal
                     'num_classes': local_image_collection['num_classes'], 'image_arr': []}
         else:
             key_list = list(image_ids.keys())
-            #random.shuffle(key_list)
+            # random.shuffle(key_list)
             for i in range(0, train_cutoff):
                 train_arr[image_ids[i]] = (image_ids[key_list[i]])
 
@@ -582,10 +216,7 @@ def get_data_by_list(input_dict, key_list):
     if type(input_dict) != type({}):
         return input_dict
     if len(key_list) > 0:
-        if type(key_list) ==  type('s'):
-            return get_data_by_list(input_dict[key_list], key_list[1:])
-        elif type(key_list) ==  type([]):
-            return get_data_by_list(input_dict[key_list[0]], key_list[1:])
+        return get_data_by_list(input_dict[key_list[0]], key_list[1:])
     return input_dict
 
 
@@ -602,30 +233,28 @@ def data_bundle_and_path(input_dict):
     return return_template, return_path_list
 
 
-def set_data_by_list(input_dict, key_list, data,index=-1):
+def set_data_by_list(input_dict, key_list, data, index=-1):
     if len(key_list) > 1:
         get_data_by_list(input_dict[key_list[0]], key_list[1:])
     else:
         if len(key_list) == 0:
-            input_dict.set_by_dict(data,index)
+            input_dict.set_by_dict(data, index)
         else:
-            input_dict[key_list[0]].set_by_dict(data,index)
+            input_dict[key_list[0]].set_by_dict(data, index)
 
 
-def add_dict_path_recs(target_dict, target_list, data,file_name):
-
+def add_dict_path_recs(target_dict, target_list, data, file_name):
     if len(target_list) > 1:
-        add_dict_path_recs(target_dict[target_list[0]], target_list[1:], data,file_name)
+        add_dict_path_recs(target_dict[target_list[0]], target_list[1:], data, file_name)
         return
     if type(target_dict[target_list[0]]) == type({}):
         target_dict[target_list[0]] = []
 
     if target_list[0] == 'filename':
-        target_dict[target_list[0]] += [file_name]*add_dict_path_recs.local_data_len
+        target_dict[target_list[0]] += [file_name] * add_dict_path_recs.local_data_len
     else:
         target_dict[target_list[0]] += data
         add_dict_path_recs.local_data_len = len(data)
-
 
 
 def create_dict_path_recs(target_dict, target_list):
@@ -656,15 +285,19 @@ def worker_load_image_data_from_dir_tree_csv(args):
         if cut_size != -1:
             local_list = local_list[:cut_size]
     schema_transformed = {}
-    for element in local_list:
-        element_tree = element.split('/')
-        create_dict_path_recs(GLOBAL_DATA, element_tree[:1])
-        if os.path.exists(dir_path + element):
-            df = pd.read_csv(dir_path + element,low_memory=False)
+    for element in list( data_schema_input.keys()):
+        element_tree = element
+        print('==============')
+        create_dict_path_recs(GLOBAL_DATA, [element_tree])
+        if os.path.exists(dir_path + element+'.csv'):
+            if not restrict:
+                df = pd.read_csv(dir_path + element+'.csv', low_memory=True)
+            else:
+                df = pd.read_csv(dir_path + element+'.csv', low_memory=True,nrows=cut_size)
             local_dict = df.to_dict()
-            local_keys =['filename']+list(local_dict.keys())
+            local_keys =  list(local_dict.keys())
             for element in local_keys:
-                create_dict_path_recs(GLOBAL_DATA, element_tree[:1] + [element])
+                create_dict_path_recs(GLOBAL_DATA, [element_tree] + [element])
             for element in local_keys:
                 try:
 
@@ -673,13 +306,28 @@ def worker_load_image_data_from_dir_tree_csv(args):
                     else:
                         local_data_arr = list(local_dict[element].values())
                     add_dict_path_recs.local_data_len = len(local_dict[list(local_dict.keys())[0]])
-                    add_dict_path_recs(GLOBAL_DATA, element_tree[:1] + [element], local_data_arr,element_tree[-1])
+                    add_dict_path_recs(GLOBAL_DATA, [element_tree] + [element], local_data_arr, element_tree[-1])
                 except Exception as e:
                     print('!!!!!!!!')
                     print(e)
                     exit(0)
     return
 
+def match_schema_name(name,names_list):
+
+        if name in names_list:
+            return True
+        for element in names_list:
+            if name in element:
+                return True
+        return False
+
+def get_arr_by_name(name,target_dict):
+    return_arr = []
+    for key in list(target_dict.keys()):
+        if name in key:
+            return_arr.append(target_dict[key])
+    return return_arr
 
 def map_schema_data_rec(data, schema, path):
     return_dict = {}
@@ -690,9 +338,12 @@ def map_schema_data_rec(data, schema, path):
     else:
         row = []
         for element in schema:
-            if element.name in list(data.keys()):
-                row.append(data[element.name])
-            elif element.type in DATA_FORMATS_SPECIAL:
+            if match_schema_name(element.name , list(data.keys())):
+                if element.type == 'arr':
+                    row.append(get_arr_by_name(element.name,data))
+                else:
+                    row.append(data[element.name])
+            elif element.type in ['2D_F', '2D_INT']:
                 row.append(
                     np.resize(find_image_by_name(data[element.name],
                                                  path), element.shape))
@@ -732,10 +383,10 @@ def worker_load_image_data_from_csv(args):
 
             if element.name in list(local_dict.keys()):
                 local_row.append(local_dict[element.name][i])
-            elif element.load_name != None and element.load_name in  list(local_dict.keys()):
+            elif element.load_name != None and element.load_name in list(local_dict.keys()):
                 local_row.append(local_dict[element.load_name][i])
             elif element.type in DATA_FORMATS_SPECIAL:
-                local_row.append(find_image_by_name (local_dict[list(local_dict.keys())[local_id_poss[0] - 1]][i],
+                local_row.append(find_image_by_name(local_dict[list(local_dict.keys())[local_id_poss[0] - 1]][i],
                                                     path))
 
 
@@ -768,7 +419,7 @@ def worker_load_image_data_from_csv(args):
         for element in data_schema_output:
             if element.name in list(local_dict.keys()):
                 local_row.append(local_dict[element.name][i])
-            elif element.load_name != None and element.load_name in  list(local_dict.keys()):
+            elif element.load_name != None and element.load_name in list(local_dict.keys()):
                 local_row.append(local_dict[element.load_name][i])
             else:
                 local_row.append(None)
@@ -807,7 +458,6 @@ def list_files(startpath, dir_path):
 
 
 def add_recursive(data, path, dict_add):
-
     if path[0] not in list(dict_add.keys()):
 
         if len(path) > 1:
@@ -830,9 +480,10 @@ def fill_global_id_data(args):
         for local_key in list(local_data.keys()):
 
             for element in back_keys:
-               add_recursive(local_data[local_key][i], [array_ids[average_len * j + i]] + [element] + [local_key],
-                          GLOBAL_ID_DATA)
+                add_recursive(local_data[local_key][i], [array_ids[average_len * j + i]] + [element] + [local_key],
+                              GLOBAL_ID_DATA)
     pass
+
 
 def recursiv_match(input_dict, data_schema, key=''):
     global GLOBAL_ID_DATA
@@ -847,23 +498,24 @@ def recursiv_match(input_dict, data_schema, key=''):
         local_dict = {}
         for local_key in list(data_schema):
             if local_key.is_id:
-                if len(array_id) == 0:
-                   array_id = copy.deepcopy(input_dict[local_key.name])
+                if len(array_id) == 0 and len(input_dict)>0:
+                    array_id = copy.deepcopy(input_dict[local_key.name])
                 else:
+                  if len(input_dict)>0:
                     for i in range(len(input_dict[local_key.name])):
-                        array_id[i] = str(array_id[i])+'-'+str(input_dict[local_key.name][i])
+                        array_id[i] = str(array_id[i]) + '-' + str(input_dict[local_key.name][i])
 
         id_list_ordered = split_list(target_list=array_id, count=THREAD_COUNT, restrict=False, size=100)
         input_dict_splited = [input_dict] * THREAD_COUNT
         array_id_splited = [array_id] * THREAD_COUNT
-        average_len = [len(id_list_ordered)] * THREAD_COUNT
-        back_keys = [['defog', 'notype', 'tdcsfog']] * THREAD_COUNT
+        average_len = [len(id_list_ordered[0])] * THREAD_COUNT
+        back_keys = [GLOBAL_DATA.keys()] * THREAD_COUNT
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = [executor.submit(fill_global_id_data, args) for args in
                        zip(id_list_ordered, input_dict_splited, array_id_splited, average_len,
                            range(len(id_list_ordered)), back_keys)]
             results = [f.result() for f in futures]
-        #exit(0)
+        # exit(0)
 
 
 def load_id_from_dir_tree_csv(dir_path, data_schema_input, data_schema_output, restrict=False, size=100):
@@ -909,42 +561,6 @@ def load_id_from_dir_tree_csv(dir_path, data_schema_input, data_schema_output, r
     return local_ids, loaded_ids_size
 
 
-def load_id_from_csv(csv_path, data_schema_input=None, data_schema_output=None, restrict=False, size=100, path=''):
-    local_ids = {}
-    data = pd.read_csv(csv_path, low_memory=False)
-    csv_reader = data.to_dict(orient='list')
-    print('len(data) >= THREAD_COUNT', len(data) >= THREAD_COUNT)
-    if len(csv_reader[list(csv_reader.keys())[0]]) > THREAD_COUNT:
-
-        id_dict = split_dict(target_dict=csv_reader, count=THREAD_COUNT, restrict=restrict, size=size)
-        data_schema = [(data_schema_input, data_schema_output)] * THREAD_COUNT
-        id_list = []
-        for i in range(THREAD_COUNT):
-            local_dict = {}
-            local_len = len(id_dict.keys()) / THREAD_COUNT
-            for local_key in list(id_dict.keys()):# list(list(id_dict.keys())[int(local_len * i):int(local_len * (i + 1))]):
-                local_dict[local_key] = id_dict[local_key][i]
-            id_list.append(local_dict)
-        if restrict:
-            size = [size] * THREAD_COUNT
-        else:
-            size = [len(id_list[0])] * THREAD_COUNT
-        restrict = [restrict] * THREAD_COUNT
-        with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
-            futures = [executor.submit(worker_load_image_data_from_csv, args) for args in
-
-                       zip(id_list, data_schema, size,
-                           restrict, path)]#data_schema[csv_path[csv_path.rindex('/') + 1:csv_path.rindex('.')]]
-            print("THREAD COUNT:", len(futures))
-            results = [f.result() for f in futures]
-
-    else:
-
-        results = worker_load_image_data_from_csv(
-            (csv_reader, (data_schema_input, data_schema_output), size, restrict, path))
-    loaded_ids_size = len(local_ids)
-    return results, loaded_ids_size
-
 
 def image_list(path):
     image_path_list = []
@@ -953,3 +569,86 @@ def image_list(path):
             if file[-3:] in IMAGE_EXTS_LIST:
                 image_path_list.append((root, file))
     return image_path_list[1:]
+
+
+def specific_submit(self, file_dest=''):
+        import csv
+        import numpy
+        f = open(file_dest + 'submission.csv', 'a+')
+        writer = csv.writer(f)
+        local_arr = []
+        local_dict ={}
+        output_id_dict = {}
+        local_arr.append('Id')
+        #for element in self.return_ids:
+        #    local_arr.append(element)
+        is_dsm = False
+        is_2A3 = False
+        if type(self.data_schema_output) is list:
+            for element in self.data_schema_output:
+                if element.is_id:
+                    output_id_dict[element.name] = None
+                else:
+                  local_arr.append(element.name)
+
+        else:
+            local_arr,local_ids = self.get_schema_names(self.data_schema_output)
+        for element in local_ids:
+            output_id_dict[element] = None
+        for element in local_arr:
+            local_dict[element] = []
+        writer.writerow(["id","reactivity_DMS_MaP","reactivity_2A3_MaP"])
+        local_id_list = {}
+        for key in list(self.bundle_bucket.keys()):
+                 local_id_list[key] = self.bundle_bucket[key].source['train_data'].get_by_name('experiment_type')
+
+        results, _ = self.predict()
+        results = np.squeeze(results)
+
+        #results = self.denormalize(results)
+        if type(results) == type(np.zeros((2))):
+                results = results.tolist()
+
+
+        #if type(results) == type({}):
+        #    results = results[list(results.keys())[0]]
+        for key in list(results.keys()):
+            print(key)
+            local_arr = []
+            final_ids = []
+            if local_id_list[key] == '2A3_MaP':
+                is_2A3 = True
+            elif local_id_list[key] == 'DMS_MaP':
+                is_dsm = True
+            try:
+                    local_id_dict = copy.deepcopy(output_id_dict)
+                    self.get_data_ids(self.bundle_bucket[key].source,local_id_dict)
+                    for element in local_ids:
+                            final_ids.append(str(local_id_dict[element]))
+                    local_arr.append('_'.join(final_ids).replace('.csv',''))
+            except IOError as e:
+                    print(e)
+                    exit(0)
+            if type(results) ==  type([]):
+                for element in results[key]:
+
+                    local_arr.append(round(element,4))
+
+
+            else:
+                       if is_dsm:
+                           local_arr.append(0)
+                           local_arr.append(numpy.mean(results[key][0]))
+                       elif is_2A3:
+                           local_arr.append(numpy.mean(results[key][0]))
+                           local_arr.append(0)
+
+            for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
+                    if element == 'Turn':
+                        arr_element = int(arr_element)
+
+
+                    #local_dict[element].append(arr_element)
+            if str(key) not in self.submited_ids:
+                    writer.writerow(local_arr)
+            self.submited_ids.append(str(key))

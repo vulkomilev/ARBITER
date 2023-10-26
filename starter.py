@@ -12,10 +12,11 @@ if gpus:
     print(e)
 #dataset_path = "./data_sets/tlvmc-parkinsons-freezing-gait-prediction/train/"
 #dataset_path = "./data_sets/abstraction-and-reasoning-challenge/training/"
-dataset_path = "./data_sets/commonlit-evaluate-student-summaries/"
-runner(dataset_path, train_name='test_images', restrict=False,
+#dataset_path = "./data_sets/commonlit-evaluate-student-summaries/"
+dataset_path = "./data_sets/stanford-ribonanza-rna-folding/"
+runner(dataset_path, train_name='test_images', restrict=True,
        size=3, target_name='letter', no_ids=False,
        submit_file='prompts_test',
        train_file='train',
-       utils_name='specific_loaders.commonLitLoader',
-       split=False, THREAD_COUNT=4, dir_tree=True)
+       utils_name='specific_loaders.ribonanzaRnaFoldingLoader',
+       split=False, THREAD_COUNT=4, dir_tree=True,submit_name='specific_loaders.ribonanzaRnaFoldingLoader')

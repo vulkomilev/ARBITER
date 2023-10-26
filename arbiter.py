@@ -107,7 +107,7 @@ class Arbiter(object):
 
     def init_neural_network(self):
         input_list = []
-        output_len = 0
+        output_len = []
         if type(self.data_schema_output) == type({}):
             for local_key in list(self.data_schema_output.keys()):
                 for i in range(len(list(self.registered_networks.keys()))):
@@ -135,13 +135,15 @@ class Arbiter(object):
                            output_len += 1
                        elif type(element.shape) == type((1, 2)):
                            output_len = element.shape
+                       else:
+                           output_len.append(element.shape)
         else:
          for element in self.data_schema_output:
             if not element.is_id:
                 if element.shape == ():
                     output_len += 1
                 elif type(element.shape) ==  type((1,2)):
-                    output_len = element.shape
+                    output_len.append(element.shape)
 
         self.input_arbiter_len = input_list
         if type(self.input_arbiter_len) == type((1, 2)):
@@ -171,8 +173,12 @@ class Arbiter(object):
             layer_size = len(input_list)
             self.arbiter_neural_network = tf.keras.layers.Dense(int(layer_size))( \
                 self.arbiter_neural_network_input)
-
-            self.arbiter_neural_network = tf.keras.layers.Dense(int(output_len))( \
+            local_size = 0
+            for element in output_len:
+                local_size +=element
+            self.arbiter_neural_network = tf.keras.layers.Dense( local_size)( \
+                    self.arbiter_neural_network)
+            self.arbiter_neural_network = tf.keras.layers.Reshape(( len(output_len),output_len[0]))( \
                     self.arbiter_neural_network)
 
         self.arbiter_neural_model = tf.keras.Model(inputs=self.arbiter_neural_network_input,
@@ -414,11 +420,8 @@ class Arbiter(object):
 
                 for key in local_predictions.keys():
                     local_result = local_predictions[key]
-                    if local_result is None:
-                        local_result = 0
-                    else:
-                        local_result = local_result
-                    x_element.append(local_result)
+                    if local_result is not None:
+                          x_element.append(local_result)
                 local_x.append(x_element)
 
                 self.train_arbiter(local_x, local_y)
@@ -433,7 +436,8 @@ class Arbiter(object):
             class_num = 1
         for agent_result in agent_results:
             local_arr_x = []
-
+            if agent_result == None:
+                continue
             if type(agent_result) != list:
                 x_fit.append(np.array(0))
             else:
@@ -445,10 +449,11 @@ class Arbiter(object):
                 if not element.is_id :
                     local_arr_y.append(y.get_by_name(element.name))
             y_fit.append(local_arr_y)
-        x_fit = np.concatenate( np.array(local_arr_x),axis=1)
-        y_fit = np.array(y_fit)
-
-        self.arbiter_neural_model.fit(x_fit, y_fit, epochs=10)
+        if len(local_arr_x) >0:
+            x_fit = np.concatenate( np.array(local_arr_x),axis=1)
+            y_fit = np.array(y_fit)
+            print(self.arbiter_neural_model.summary())
+            self.arbiter_neural_model.fit(x_fit, y_fit, epochs=10)
 
     def predict(self):
         local_agents = []

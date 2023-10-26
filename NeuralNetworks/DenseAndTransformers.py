@@ -75,10 +75,10 @@ class DenseAndTransformers(Agent):
         self.loss_history = []
         for element in input_dict:
          if element.is_id == False:
-             self.reg_input.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
+             self.reg_input.append(DataUnit(str(element.type), element.shape, None, '', is_id=element.is_id))
         for element in output_dict:
          if element.is_id == False:
-             self.reg_output.append(DataUnit(str(element.type), (), None, '', is_id=element.is_id))
+             self.reg_output.append(DataUnit(str(element.type), element.shape, None, '', is_id=element.is_id))
 
         self.init_neural_network()
     def register(self, arbiter):
@@ -217,7 +217,9 @@ class DenseAndTransformers(Agent):
            local_data  = [x[1] ,np.array(y)]#y[0]
            #print(int(y[0]))
            #exit(0)
-           adapt_list.append([local_data[0]])
+           for element in [*x[0]]:
+               if element not in adapt_list:
+                   adapt_list.append(element)
            #self.vectorize_layer.adapt([[local_data[0]]])
            normalized_data_input.append(local_data[0])
            normalized_data_output.append(local_data[1])

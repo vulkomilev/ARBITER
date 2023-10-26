@@ -575,19 +575,24 @@ agent_router = [{'DenseScrable':{'inputs':['Image','Id'],
 
 target_type = CATEGORY
 
-data_schema_input = {"summaries_train":
-                         [DataUnit('str', (), None, 'student_id', is_id=True),
-                          DataUnit('str', (), None, 'prompt_id'),
-                          DataUnit('str', (), None, 'text', )],
+data_schema_input = {"train_data":
+                         [DataUnit('str', (), None, 'sequence_id', is_id=True),
+                          DataUnit('str', (), None, 'sequence'),
+                          DataUnit('str', (), None, 'experiment_type', ),
+                          DataUnit('str', (), None, 'dataset_name', ),
+                          DataUnit('int', (), None, 'reads', ),
+                          DataUnit('float', (), None, 'signal_to_noise', ),
+                          DataUnit('bool', (), None, 'SN_filter', ),],
                      }
 
-data_schema_output = {'summaries_train':[
-    DataUnit('str', (), None, 'student_id', is_id=True),
-    DataUnit('float', (), None, 'content', ),
-    DataUnit('float', (), None, 'wording', )]}
+data_schema_output = {'train_data':[
+    DataUnit('str', (), None, 'sequence_id', is_id=True),
+
+    DataUnit('arr', (500), None, 'reactivity', ),
+    DataUnit('arr', (500), None, 'reactivity_error', )]}
 
 # tripId,UnixTimeMillis,LatitudeDegrees,LongitudeDegrees
-agent_router = [{'DenseAndTransformers':None},{'HistogramDense':None}]
+agent_router = [{'DenseAndTransformers':None}]
 
 
 # MAKE A ARCH SEARCH OR SOMETHING OTHER SEARCH BASED ON GENETIC ALGORITHM SO THE PC WILL EXPLORE WHILE YOU ARE GONE
@@ -598,8 +603,10 @@ def runner(dataset_path, train_name='train', restrict=True, \
            submit_file='test',
            train_file='train',
            split=True, THREAD_COUNT=32, dir_tree=True,
-           utils_name='utils'):
+           utils_name='utils',
+           submit_name = None):
     exec('from utils.' + utils_name + ' import image_loader')
+    exec('from utils.' + submit_name + ' import specific_submit')
     print('data_schema_input 1', data_schema_input)
     image_loader = importlib.import_module('utils.' + utils_name, package='.').image_loader
     print(image_loader)
@@ -612,6 +619,8 @@ def runner(dataset_path, train_name='train', restrict=True, \
                                                                  dir_tree=dir_tree)
     print('data_bundle_list', len(image_collection_train['image_arr']))
     print('DATA COLLECTED')
+    if submit_name != None:
+        exec('Arbiter.submit = specific_submit')
     arbiter = Arbiter(data_schema_input=data_schema_input,
                       data_schema_output=data_schema_output, target_type=target_type,
                       class_num=image_collection_train['num_classes'],
@@ -619,6 +628,7 @@ def runner(dataset_path, train_name='train', restrict=True, \
     # print(type(image_collection_train['image_arr']))
     # print(image_collection_train['image_arr'][0])
     # exit(0)
+
     if type(image_collection_train['image_arr']) == type([]):
         for i, element in zip(range(len(image_collection_train['image_arr'])), image_collection_train['image_arr']):
             arbiter.add_bundle_bucket(i, element)
@@ -633,17 +643,22 @@ def runner(dataset_path, train_name='train', restrict=True, \
         arbiter.train(force_train=True, train_arbiter=True)
     arbiter.save()
     arbiter.empty_bucket()
-    data_schema_input_test = {"summaries_test":
-                             [DataUnit('str', (), None, 'student_id', is_id=True),
-                              DataUnit('str', (), None, 'prompt_id'),
-                              DataUnit('str', (), None, 'text', )],
+    data_schema_input_test = {"train_data":
+                             [DataUnit('str', (), None, 'sequence_id', is_id=True),
+                              DataUnit('str', (), None, 'sequence'),
+                              DataUnit('str', (), None, 'experiment_type', ),
+                              DataUnit('str', (), None, 'dataset_name', ),
+                              DataUnit('int', (), None, 'reads', ),
+                              DataUnit('float', (), None, 'signal_to_noise', ),
+                              DataUnit('bool', (), None, 'SN_filter', ), ],
                          }
 
-    data_schema_output_test = {'summaries_test': [
-        DataUnit('str', (), None, 'student_id', is_id=True),
-        DataUnit('float', (), None, 'content', ),
-        DataUnit('float', (), None, 'wording', )]}
-    arbiter.remap_registered_networks("summaries_test","summaries_test")
+    data_schema_output_test = {'train_data': [
+        DataUnit('str', (), None, 'sequence_id', is_id=True),
+
+        DataUnit('arr', (500), None, 'reactivity', ),
+        DataUnit('arr', (500), None, 'reactivity_error', )]}
+    #arbiter.remap_registered_networks("summaries_test","summaries_test")
     image_collection_train, image_collection_test = image_loader(dataset_path
                                                                  , train_name=submit_file, restrict=restrict, \
                                                                  size=size, target_name='letter', no_ids=False,
