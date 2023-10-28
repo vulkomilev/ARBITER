@@ -14,7 +14,7 @@ if gpus:
 #dataset_path = "./data_sets/abstraction-and-reasoning-challenge/training/"
 #dataset_path = "./data_sets/commonlit-evaluate-student-summaries/"
 dataset_path = "./data_sets/stanford-ribonanza-rna-folding/"
-runner(dataset_path, train_name='test_images', restrict=True,
+runner(dataset_path, train_name='test_images', restrict=False,
        size=3, target_name='letter', no_ids=False,
        submit_file='prompts_test',
        train_file='train',
