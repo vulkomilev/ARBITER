@@ -14,9 +14,9 @@ if gpus:
 #dataset_path = "./data_sets/abstraction-and-reasoning-challenge/training/"
 #dataset_path = "./data_sets/commonlit-evaluate-student-summaries/"
 dataset_path = "./data_sets/stanford-ribonanza-rna-folding/"
-runner(dataset_path, train_name='test_images', restrict=False,
+runner(dataset_path, train_name='test_images', restrict=True,
        size=3, target_name='letter', no_ids=False,
-       submit_file='prompts_test',
+       submit_file='test_sequences',
        train_file='train',
        utils_name='specific_loaders.ribonanzaRnaFoldingLoader',
-       split=False, THREAD_COUNT=4, dir_tree=True,submit_name='specific_loaders.ribonanzaRnaFoldingLoader')
+       split=False, THREAD_COUNT=32, dir_tree=True,submit_name='specific_loaders.ribonanzaRnaFoldingLoader')

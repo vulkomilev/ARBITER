@@ -14,7 +14,7 @@ import pandas as pd
 from matplotlib import image
 from ..utils import DataUnit,DataBundle,DataCollection,DATA_FORMATS_SPECIAL,find_image_by_name,DataInd,IMAGE_EXTS_LIST
 
-
+GLOBAL_MAX_ID = 0
 # is this thread save
 def image_json_loader_worker(args):
     global loaded_ids_target
@@ -275,7 +275,7 @@ def create_dict_path_recs(target_dict, target_list):
 
 
 def worker_load_image_data_from_dir_tree_csv(args):
-    global GLOBAL_DATA
+    global GLOBAL_DATA,GLOBAL_MAX_ID
     local_list, schema, cut_size, restrict, dir_path = args
     data_schema_input, data_schema_output = schema
 
@@ -294,6 +294,22 @@ def worker_load_image_data_from_dir_tree_csv(args):
                 df = pd.read_csv(dir_path + element+'.csv', low_memory=True)
             else:
                 df = pd.read_csv(dir_path + element+'.csv', low_memory=True,nrows=cut_size)
+
+            with open(dir_path + element+'.csv', 'rb') as f:
+                try:  # catch OSError in case of a one line file
+                    f.seek(-2, os.SEEK_END)
+                    while f.read(1) != b'\n':
+                        f.seek(-2, os.SEEK_CUR)
+                except OSError:
+                    f.seek(0)
+                last_line = f.readline().decode()
+            print('last_line',last_line.split(',')[1])
+            try:
+
+                GLOBAL_MAX_ID = int(last_line.split(',')[1])
+                print("int(last_line.split(',')[1])",last_line.split(','))
+            except Exception as e :
+                pass
             local_dict = df.to_dict()
             local_keys =  list(local_dict.keys())
             for element in local_keys:
@@ -574,6 +590,7 @@ def image_list(path):
 def specific_submit(self, file_dest=''):
         import csv
         import numpy
+        global GLOBAL_MAX_ID
         f = open(file_dest + 'submission.csv', 'a+')
         writer = csv.writer(f)
         local_arr = []
@@ -599,12 +616,18 @@ def specific_submit(self, file_dest=''):
             local_dict[element] = []
         writer.writerow(["id","reactivity_DMS_MaP","reactivity_2A3_MaP"])
         local_minmax_list = {}
+        local_max = 0
         for key in list(self.bundle_bucket.keys()):
             local_minmax_list[key] = {'min':None,'max':None}
             local_minmax_list[key]['min'] = self.bundle_bucket[key].source['test_sequences'].get_by_name('id_min')
             local_minmax_list[key]['max'] = self.bundle_bucket[key].source['test_sequences'].get_by_name('id_max')
+            if local_max < local_minmax_list[key]['max']:
+                local_max = local_minmax_list[key]['max']
 
-
+        for key in list(local_minmax_list.keys()):
+            print("GLOBAL_MAX_ID",GLOBAL_MAX_ID)
+            if local_minmax_list[key]['max']  == local_max:
+                local_minmax_list[key]['max'] =   GLOBAL_MAX_ID
         results, _ = self.predict()
         results = np.squeeze(results)
 
@@ -625,9 +648,32 @@ def specific_submit(self, file_dest=''):
             #    is_2A3 = True
             #elif local_id_list[key] == 'DMS_MaP':
             #    is_dsm = True
+            rows_to_write = []
             for i in range(local_minmax_list[key]['min'] , local_minmax_list[key]['max']+1):
                 local_arr = []
-                print(i)
+                if is_dsm:
+                    local_arr.append(0)
+                    local_arr.append(0.1)
+                elif is_2A3:
+                    local_arr.append(0.1)
+                    local_arr.append(0)
+                rows_to_write = [[0.1,0]]*( local_minmax_list[key]['max']+1-local_minmax_list[key]['min'])
+                ids = [list(range(local_minmax_list[key]['max']+1-local_minmax_list[key]['min']))]
+                ids =  np.reshape(ids,(local_minmax_list[key]['max']+1-local_minmax_list[key]['min'],1))
+                rows_to_write = np.array(rows_to_write)
+                ids = np.array(ids, dtype='O')
+
+                rows_to_write =np.concatenate((ids,rows_to_write),axis=1)
+
+                break
+
+                #if str(i-local_minmax_list[key]['min']) not in self.submited_ids:
+                #    rows_to_write.append(local_arr)
+                if i%10000 == 0:
+                    print(i/float(GLOBAL_MAX_ID)*100)
+                self.submited_ids.append(str(key))
+                break
+                #print(i)
                 try:
                         local_id_dict = copy.deepcopy(output_id_dict)
                         self.get_data_ids(self.bundle_bucket[key].source,local_id_dict)
@@ -645,11 +691,19 @@ def specific_submit(self, file_dest=''):
 
 
                 else:
+                    try:
                            if is_dsm:
                                local_arr.append(0)
                                local_arr.append(round(results[key][0][i-local_minmax_list[key]['min']],3))
                            elif is_2A3:
                                local_arr.append(round(results[key][0][i-local_minmax_list[key]['min']],3))
+                               local_arr.append(0)
+                    except Exception as e:
+                           if is_dsm:
+                               local_arr.append(0)
+                               local_arr.append(0.1)
+                           elif is_2A3:
+                               local_arr.append(0.1)
                                local_arr.append(0)
 
                 for element,arr_element in zip(self.get_schema_names(self.data_schema_output),local_arr):
@@ -659,5 +713,8 @@ def specific_submit(self, file_dest=''):
 
                         #local_dict[element].append(arr_element)
                 if str(i-local_minmax_list[key]['min']) not in self.submited_ids:
-                        writer.writerow(local_arr)
+                    rows_to_write.append(local_arr)
+
                 self.submited_ids.append(str(key))
+            print('rows_to_write',rows_to_write.tolist())
+            writer.writerows(rows_to_write.tolist())
