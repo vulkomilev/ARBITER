@@ -616,7 +616,7 @@ def specific_submit(self, file_dest=''):
             local_dict[element] = []
         writer.writerow(["id","reactivity_DMS_MaP","reactivity_2A3_MaP"])
         for i in range(10):
-            rows_to_write = [[0.1, 0]] * (int(GLOBAL_MAX_ID/10))
+            rows_to_write = [[0, 0]] * (int(GLOBAL_MAX_ID/10))
             ids = [list(range(int(GLOBAL_MAX_ID/10 )*(i),int(GLOBAL_MAX_ID/10 )*(i+1)))]
             ids = np.reshape(ids, (int(GLOBAL_MAX_ID/10 )*(i+ 1) - int(GLOBAL_MAX_ID/10 )*(i), 1))
             rows_to_write = np.array(rows_to_write)
