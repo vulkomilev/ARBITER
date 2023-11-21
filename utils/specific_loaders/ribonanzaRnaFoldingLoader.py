@@ -307,7 +307,7 @@ def worker_load_image_data_from_dir_tree_csv(args):
             try:
 
                 GLOBAL_MAX_ID = int(last_line.split(',')[1])
-                print("int(last_line.split(',')[1])",last_line.split(','))
+                print("GLOBAL_MAX_ID",GLOBAL_MAX_ID)
             except Exception as e :
                 pass
             local_dict = df.to_dict()
@@ -625,6 +625,10 @@ def specific_submit(self, file_dest=''):
             print('ids',ids)
             rows_to_write = np.concatenate((ids, rows_to_write), axis=1)
             writer.writerows(rows_to_write.tolist())
+        rows_to_write = [[0, 0]]
+        ids  = [[GLOBAL_MAX_ID]]
+        rows_to_write = np.concatenate((ids, rows_to_write), axis=1)
+        writer.writerows(rows_to_write.tolist())
         return
         local_minmax_list = {}
         local_max = 0
